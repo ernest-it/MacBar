@@ -93,6 +93,11 @@ namespace MacBar
         public override void ApplyAppearance()
         {
             base.ApplyAppearance();
+            // Current Windows 11 builds paint the system blur over the whole window rectangle and ignore
+            // the rounded window region, which drew a square box around the rounded dock. So the dock
+            // draws only its own rounded tint, a little denser when blur is on to keep the same contrast.
+            Theme.ApplyBlur(Hwnd, 0);
+            Bar.Background = Theme.BarTint(S.Blur > 0 ? Math.Min(100, S.Opacity + 15) : S.Opacity);
             Bar.CornerRadius = new CornerRadius(Radius());
             Bar.BorderBrush = Theme.Dark ? new SolidColorBrush(Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF)) : new SolidColorBrush(Color.FromArgb(0x30, 0x00, 0x00, 0x00));
             separator.Background = Theme.FgAlpha(0x40);

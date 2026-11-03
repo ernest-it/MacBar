@@ -208,7 +208,11 @@ namespace MacBar
             content.Children.Add(pill);
 
             pages.RenderTransform = slide;
-            pagesHost.Children.Add(pages);
+            // The page strip is several screens wide. Inside a Grid it would get "layout clipped" to one
+            // screen (pages 2+ empty after sliding), so it sits on a Canvas, which never clips its children.
+            var strip = new Canvas();
+            strip.Children.Add(pages);
+            pagesHost.Children.Add(strip);
             Grid.SetRow(pagesHost, 1);
             content.Children.Add(pagesHost);
             // Search results (apps, Settings pages, files) replace the pages while typing.

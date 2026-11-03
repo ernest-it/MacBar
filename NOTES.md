@@ -278,3 +278,15 @@ caption, so they don't trigger it.
     to the user profile; AppData, dot-folders and node_modules are skipped). Queries run on a
     background thread with a short debounce, and only the newest query's results are shown.
   - Enter opens the top result. Right-click a file → Show in File Explorer.
+- **Empty pages 2+ on the app page:** the page strip (a horizontal StackPanel several screens wide)
+  was inside a Grid, which "layout clips" a child to the space it was given, so every page past the
+  first was cut off before the slide moved it into view. The strip now sits on a Canvas, which
+  doesn't clip its children.
+- **Square box around the rounded dock:** on this Windows 11 build (26200) the system blur
+  (`SetWindowCompositionAttribute` accent) is painted over the whole window rectangle and ignores the
+  rounded `SetWindowRgn`. Tried and rejected:
+  - Non-layered DWM window: same result.
+  - `DwmEnableBlurBehindWindow` with a rounded blur region: same result.
+  - `DWMWA_WINDOW_CORNER_PREFERENCE`: only rounds to a fixed ~8 px, plus a system shadow.
+  The dock now skips the system blur and draws only its rounded tint, 15 points denser when blur is
+  on. The menu bar is a full-width rectangle, so it keeps its blur.
