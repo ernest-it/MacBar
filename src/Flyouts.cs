@@ -17,14 +17,16 @@ namespace MacBar
         static Flyout open;
         readonly string key;
         protected readonly StackPanel Body = new StackPanel();
+        protected readonly Border Card;
 
         public Flyout(string key, double width)
         {
             this.key = key;
             WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = Brushes.Transparent;
             Topmost = true; ShowInTaskbar = false; ResizeMode = ResizeMode.NoResize; SizeToContent = SizeToContent.WidthAndHeight;
-            FontFamily = Theme.Font; FontSize = 13; Foreground = Theme.Fg;
-            Content = new Border
+            FontFamily = Theme.Font; FontSize = 13; Foreground = Theme.Fg; UseLayoutRounding = true;
+            TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
+            Content = Card = new Border
             {
                 Width = width, Margin = new Thickness(10, 4, 10, 14), Padding = new Thickness(14, 12, 14, 12), CornerRadius = new CornerRadius(12),
                 Background = Theme.PopupBg, BorderBrush = Theme.FgAlpha(0x30), BorderThickness = new Thickness(1),
@@ -176,7 +178,7 @@ namespace MacBar
                     {
                         Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Margin = new Thickness(0, 0, 10, 0),
                         Background = dev.IsDefault ? new SolidColorBrush(Theme.Accent) : Theme.FgAlpha(0x22),
-                        Child = new Viewbox { Width = 14, Height = 11, Child = Glyphs.Speaker(2, false, dev.IsDefault ? Brushes.White : null) }
+                        Child = Glyphs.Speaker(2, false, dev.IsDefault ? Brushes.White : null, 14)
                     };
                     r.Children.Add(badge);
                     var name = Text(dev.Name, 13, dev.IsDefault ? FontWeights.SemiBold : FontWeights.Normal, 1);

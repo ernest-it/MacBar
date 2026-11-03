@@ -4,10 +4,12 @@ setlocal
 set FW=%WINDIR%\Microsoft.NET\Framework64\v4.0.30319
 set CSC=%FW%\csc.exe
 set WPF=%FW%\WPF
+rem WinRT metadata (Bluetooth/airplane radios, media controls) ships with Windows 10/11.
+set WINMD=%WINDIR%\System32\WinMetadata
 cd /d "%~dp0"
 if not exist bin mkdir bin
 
-set REFS=/r:"%WPF%\PresentationCore.dll" /r:"%WPF%\PresentationFramework.dll" /r:"%WPF%\WindowsBase.dll" /r:"%FW%\System.Xaml.dll" /r:"%FW%\System.Web.Extensions.dll" /r:System.dll /r:System.Core.dll /r:System.Xml.dll /r:System.Drawing.dll
+set REFS=/r:"%WPF%\PresentationCore.dll" /r:"%WPF%\PresentationFramework.dll" /r:"%WPF%\WindowsBase.dll" /r:"%FW%\System.Xaml.dll" /r:"%FW%\System.Web.Extensions.dll" /r:System.dll /r:System.Core.dll /r:System.Xml.dll /r:System.Drawing.dll /r:System.Management.dll /r:"%FW%\System.Runtime.dll" /r:"%WINMD%\Windows.Foundation.winmd" /r:"%WINMD%\Windows.Devices.winmd" /r:"%WINMD%\Windows.Media.winmd" /r:"%WINMD%\Windows.Storage.winmd"
 
 set ICON=
 if exist assets\MacBar.ico set ICON=/win32icon:assets\MacBar.ico

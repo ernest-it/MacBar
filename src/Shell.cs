@@ -308,10 +308,36 @@ namespace MacBar
                 var outBits = new byte[px * px * 4];
                 for (int y = 0; y < px; y++) Marshal.Copy(dd.Scan0 + y * dd.Stride, outBits, y * px * 4, px * 4);
                 db.UnlockBits(dd);
+                // Downscaling a big icon a lot softens it; a light unsharp mask restores crisp edges.
+                double factor = (double)Math.Max(srcRect.Width, srcRect.Height) / px;
+                if (factor > 1.05) Sharpen(outBits, px, factor >= 2 ? 0.45 : 0.3);
                 var result = BitmapSource.Create(px, px, 96, 96, PixelFormats.Pbgra32, null, outBits, px * 4);
                 result.Freeze();
                 return result;
             }
+        }
+
+        /// <summary>Unsharp mask (3x3) on premultiplied BGRA; alpha is left unchanged.</summary>
+        static void Sharpen(byte[] p, int n, double amount)
+        {
+            var src = (byte[])p.Clone();
+            for (int y = 1; y < n - 1; y++)
+                for (int x = 1; x < n - 1; x++)
+                {
+                    int i = (y * n + x) * 4;
+                    int a = src[i + 3];
+                    if (a == 0) continue;
+                    for (int c = 0; c < 3; c++)
+                    {
+                        int sum = 0;
+                        for (int dy = -1; dy <= 1; dy++)
+                            for (int dx = -1; dx <= 1; dx++)
+                                sum += src[((y + dy) * n + (x + dx)) * 4 + c];
+                        double blur = sum / 9.0;
+                        double v = src[i + c] + amount * (src[i + c] - blur);
+                        p[i + c] = (byte)Math.Max(0, Math.Min(a, Math.Round(v))); // premultiplied: color <= alpha
+                    }
+                }
         }
 
         public static ImageSource ForWindow(IntPtr h)

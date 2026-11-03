@@ -26,6 +26,8 @@ namespace MacBar
             WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = Brushes.Transparent;
             ShowInTaskbar = false; Topmost = true; ResizeMode = ResizeMode.NoResize; ShowActivated = false;
             FontFamily = Theme.Font; UseLayoutRounding = true;
+            // Pixel-snapped text/glyph rendering; WPF's default "Ideal" mode looks soft at small sizes.
+            TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
             Content = Bar;
             SourceInitialized += delegate
             {
@@ -93,7 +95,6 @@ namespace MacBar
     public class TopBar : BarWindow
     {
         public const double BarHeight = 28;
-        static readonly ScaleTransform GlyphScale = new ScaleTransform(0.92, 0.92);
         readonly TrayHost tray;
         readonly WeatherService weather;
         readonly AudioController audio = new AudioController();
@@ -114,7 +115,11 @@ namespace MacBar
         {
             this.tray = tray; this.weather = weather;
             Height = BarHeight; Width = 800; Left = 0; Top = 0;
-            Bar.Child = root;
+            // The Now Playing island floats in the (otherwise empty) center of the bar.
+            var layers = new Grid();
+            layers.Children.Add(root);
+            layers.Children.Add(new NowPlayingIsland());
+            Bar.Child = layers;
             DockPanel.SetDock(right, Dock.Right);
             root.Children.Add(right);
             root.Children.Add(left);
@@ -174,7 +179,7 @@ namespace MacBar
             left.Margin = new Thickness(6, 0, 0, 0); right.Margin = new Thickness(0, 0, 6, 0);
 
             logoItem = Item(Glyphs.Logo());
-            ((FrameworkElement)logoItem.Child).VerticalAlignment = VerticalAlignment.Center; ((FrameworkElement)logoItem.Child).LayoutTransform = GlyphScale;
+            ((FrameworkElement)logoItem.Child).VerticalAlignment = VerticalAlignment.Center;
             logoItem.Padding = new Thickness(10, 0, 10, 0);
             logoItem.MouseLeftButtonUp += delegate { App.Trace("logo click"); ShowSystemMenu(); };
             left.Children.Add(logoItem);
@@ -232,6 +237,16 @@ namespace MacBar
             batteryItem = Item(bp);
             batteryItem.MouseLeftButtonUp += delegate { ShellUtil.Open("ms-settings:batterysaver"); };
             right.Children.Add(batteryItem);
+
+            // Control Center (macOS puts it just left of the clock).
+            var cc = Item(Glyphs.ControlCenter());
+            cc.ToolTip = "Control Center";
+            cc.MouseLeftButtonUp += delegate
+            {
+                if (Flyout.ToggleOff("control")) return;
+                new ControlCenterFlyout(audio, cc, delegate { PollStatus(true); }).ShowBelow(cc);
+            };
+            right.Children.Add(cc);
 
             // Date and time share one button, like macOS ("Mon Nov 3  11:14 PM").
             dateText = Label("", false);
@@ -360,7 +375,7 @@ namespace MacBar
                 soundItem.Visibility = audio.Available ? Visibility.Visible : Visibility.Collapsed;
                 int waves = audio.Volume < 0.01 ? 0 : audio.Volume < 0.34 ? 1 : audio.Volume < 0.67 ? 2 : 3;
                 var g = Glyphs.Speaker(waves, audio.Muted);
-                g.VerticalAlignment = VerticalAlignment.Center; g.LayoutTransform = GlyphScale;
+                g.VerticalAlignment = VerticalAlignment.Center;
                 soundItem.Child = g;
                 soundItem.ToolTip = audio.Muted ? "Sound: muted" : "Volume: " + Math.Round(audio.Volume * 100) + "%";
             }
@@ -382,7 +397,7 @@ namespace MacBar
                     g = Glyphs.Wifi(0, false);
                     wifiItem.ToolTip = net.HasWifiAdapter ? "Wi-Fi: not connected" : "No network connection";
                 }
-                g.VerticalAlignment = VerticalAlignment.Center; g.LayoutTransform = GlyphScale;
+                g.VerticalAlignment = VerticalAlignment.Center;
                 wifiItem.Child = g;
             }
             if (battery.Poll() || force)
@@ -391,7 +406,7 @@ namespace MacBar
                 var bp = (StackPanel)batteryItem.Child;
                 while (bp.Children.Count > 1) bp.Children.RemoveAt(1);
                 var g = Glyphs.Battery(battery.Percent, battery.Charging);
-                g.VerticalAlignment = VerticalAlignment.Center; g.LayoutTransform = GlyphScale;
+                g.VerticalAlignment = VerticalAlignment.Center;
                 bp.Children.Add(g);
                 batteryText.Text = battery.Percent + "%";
                 batteryText.Visibility = S.ShowBatteryPercent ? Visibility.Visible : Visibility.Collapsed;

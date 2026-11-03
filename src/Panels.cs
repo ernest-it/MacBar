@@ -116,7 +116,7 @@ namespace MacBar
             {
                 Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Margin = new Thickness(0, 0, 10, 0),
                 Background = n.Connected ? new SolidColorBrush(Theme.Accent) : Theme.FgAlpha(0x22),
-                Child = new Viewbox { Width = 14, Height = 12, Child = Glyphs.Wifi(bars, true, n.Connected ? Brushes.White : null) }
+                Child = Glyphs.Wifi(bars, true, n.Connected ? Brushes.White : null, 14)
             };
             DockPanel.SetDock(badge, Dock.Left);
             row.Children.Add(badge);

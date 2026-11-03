@@ -19,6 +19,12 @@ while it runs and puts it back when you quit.
 - Click an icon again to close its panel
 - **Wi‑Fi** panel: on/off switch, current network, known and other networks, connect/disconnect
 - **Sound** panel: volume slider, mute, output device switcher; scroll over the icon to change volume
+- **Control Center** (sliders icon next to the clock): Wi‑Fi, Bluetooth and Airplane Mode toggles,
+  Do Not Disturb and Screen Mirroring tiles, display brightness (laptops and DDC/CI monitors),
+  volume, and Now Playing
+- **Now Playing island** in the middle of the menu bar: album art, title and live equalizer while
+  music plays; hover for controls, click for a big player with blurred album-art background and a
+  seekable progress bar (works with Spotify, browsers and any app using Windows media controls)
 - **Calendar** panel: today's date, month calendar, shortcuts to notifications and Do Not Disturb
 - **Weather**: current conditions + 6-day forecast from [Open-Meteo](https://open-meteo.com) (no API key,
   no Windows location access; pick your city in Settings; °F or °C; refreshes every 30 min; works offline

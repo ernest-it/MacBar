@@ -169,4 +169,39 @@ caption, so they don't trigger it.
   (Ubuntu-style "intellihide": hides only when the focused window covers the dock area).
 - Bug: open File Explorer windows showed up as a separate dock icon because the Windows 11
   Explorer pin has only an AUMID and Explorer windows have none. Special-cased in `DockItem.Matches`.
-- Repo: removed the Claude co-author trailer from history at the user's request.
+- Repo: removed the Claude co-author trailer from history at the user's request (amended the
+  first commit, force-pushed, re-pointed the v1.0.0 tag).
+- Process bug: patching files with PowerShell 5.1 `Get-Content -Raw` reads UTF-8 (no BOM) as
+  Windows-1252, which garbled "…", "→", "‑" (e.g. menu text "Settings…"). Repaired by reversing
+  the mis-decoding; all edits now go through an encoding-safe editor.
+
+### 2026-11-03 — feedback round 4: Control Center, Now Playing, sharper icons
+- **WinRT from the built-in compiler.** Bluetooth/airplane/media need WinRT APIs. `csc` can reference
+  the `.winmd` files in `C:\Windows\System32\WinMetadata`, but `await` on WinRT operations normally
+  needs `System.Runtime.WindowsRuntime`, which expects the SDK's merged `Windows.winmd` (not on
+  normal PCs). Solution: our own `GetAwaiter` extension for `IAsyncOperation<T>` (`WinRt.cs`) that
+  completes a `TaskCompletionSource` from the operation's `Completed` callback.
+- **Control Center** (`ControlCenter.cs`), modeled on macOS:
+  - Connectivity module: Wi‑Fi and Bluetooth via `Windows.Devices.Radios` (`Radio.SetStateAsync`);
+    Airplane Mode via the RadioManagement COM API (`IRadioManager`, CLSID 581333F6…), the same one
+    Quick Settings uses. Circle = toggle; clicking "Wi‑Fi" opens the network list.
+  - Tiles: Do Not Disturb (no public API to toggle it → opens notification settings) and Screen
+    Mirroring (Win+K cast flyout).
+  - Display brightness: laptop panels via WMI `WmiMonitorBrightnessMethods`, external monitors via
+    DDC/CI (`dxva2` `SetMonitorBrightness`, ~60 ms per call → background writer that only sends the
+    latest value). Hidden if the monitor doesn't support either.
+  - Sound slider and a Now Playing card.
+- **Now Playing "island"** (`NowPlaying.cs`): black pill centered in the menu bar (the empty middle of
+  the ultrawide), à la Dynamic Island: album art, title, animated green equalizer bars while playing;
+  hover widens it to show artist + prev/play/next; click drops a player card with the album art
+  blurred (60 px Gaussian) and darkened as the backdrop, big art, "Playing from Spotify", a seekable
+  progress bar (position is extrapolated between the app's sparse timeline updates) and transport
+  controls. Uses `GlobalSystemMediaTransportControlsSessionManager`; album art read through
+  `DataReader` because `AsStreamForRead` isn't available without the SDK.
+- **Blurry icons, round 2:**
+  - Menu bar: the hand-drawn vector glyphs sat on fractional pixels. Replaced with Windows 11's
+    **Segoe Fluent Icons** font (hinted for 16 px), layered like the real taskbar (faint full glyph +
+    signal/volume level on top), with `TextFormattingMode.Display` on all bars and panels. Removed
+    the 0.92 scale transform, which itself was blurring things.
+  - Dock: shrinking 256 → 44 px loses edge contrast; added a light 3×3 unsharp mask after the
+    bicubic downsample (color clamped to alpha because the pixels are premultiplied).
