@@ -251,3 +251,8 @@ caption, so they don't trigger it.
 - Control Center: the Screen Mirroring tile touched the Display card. Only the connectivity card had
   a bottom margin, and the stacked icon-over-label tiles made the right column the taller one. Moved
   the gap to the row, and the tiles now put the icon beside the label (macOS layout).
+- Dock: NoMachine showed a blank page. Its windows belong to `nxplayer.bin`, and the shell only uses
+  a program's own icon for `.exe` files, so a `.bin` gets the generic file icon. For a non-.exe (or
+  an .exe with no icons), the dock now looks for a Start menu shortcut to the same exe or the same
+  folder (`ShellUtil.ShortcutForIconless`). It uses that shortcut's icon, its name ("NoMachine"
+  instead of "NoMachine Player Process"), and launches through it.

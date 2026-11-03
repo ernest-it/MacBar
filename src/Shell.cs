@@ -149,6 +149,47 @@ namespace MacBar
             catch (Exception ex) { MessageBox.Show("Couldn't open " + target + "\n\n" + ex.Message, "MacBar"); }
         }
 
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern uint ExtractIconEx(string file, int index, IntPtr[] large, IntPtr[] small, uint n);
+
+        static Dictionary<string, string> shortcutByTarget, shortcutByDir;
+
+        /// <summary>
+        /// Some apps' windows belong to a helper binary with no icon of its own (NoMachine runs as
+        /// nxplayer.bin). For those, find the app's Start menu shortcut: an exact target match, or a
+        /// shortcut pointing into the same folder. Returns null if the exe has its own icon.
+        /// </summary>
+        public static string ShortcutForIconless(string exe)
+        {
+            if (string.IsNullOrEmpty(exe) || !System.IO.File.Exists(exe)) return null;
+            // The shell only shows a program's own icon for .exe files; anything else (.bin) gets a blank page.
+            bool isExe = exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase);
+            try { if (isExe && ExtractIconEx(exe, -1, null, null, 0) > 0) return null; } catch { return null; }
+            if (shortcutByTarget == null)
+            {
+                shortcutByTarget = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                shortcutByDir = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var root in new[] { Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu), Environment.GetFolderPath(Environment.SpecialFolder.StartMenu) })
+                {
+                    string[] lnks;
+                    try { lnks = System.IO.Directory.GetFiles(root, "*.lnk", System.IO.SearchOption.AllDirectories); } catch { continue; }
+                    foreach (var lnk in lnks)
+                    {
+                        string target = ResolveLnk(lnk);
+                        if (target == null || !target.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) continue;
+                        string n = System.IO.Path.GetFileNameWithoutExtension(lnk).ToLowerInvariant();
+                        if (n.Contains("uninstall") || n.Contains("readme")) continue;
+                        if (!shortcutByTarget.ContainsKey(target)) shortcutByTarget[target] = lnk;
+                        string dir = System.IO.Path.GetDirectoryName(target);
+                        if (dir != null && !shortcutByDir.ContainsKey(dir)) shortcutByDir[dir] = lnk;
+                    }
+                }
+            }
+            string found;
+            if (shortcutByTarget.TryGetValue(exe, out found)) return found;
+            if (shortcutByDir.TryGetValue(System.IO.Path.GetDirectoryName(exe), out found)) return found;
+            return null;
+        }
+
         public static string ResolveLnk(string lnk)
         {
             object sh = null, sc = null;

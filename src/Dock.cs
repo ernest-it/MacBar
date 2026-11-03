@@ -232,7 +232,16 @@ namespace MacBar
                     bool useAumid = w.IsUwp && !string.IsNullOrEmpty(w.Aumid);
                     item.LaunchTarget = useAumid ? "shell:AppsFolder\\" + w.Aumid : w.ExePath;
                     item.Name = w.IsUwp ? w.Title : (AppNames.ForExe(w.ExePath) ?? w.Title);
-                    ImageSource icon = IconLoader.LoadSharp(useAumid ? "shell:AppsFolder\\" + w.Aumid : w.ExePath, IconPx());
+                    string iconSource = useAumid ? "shell:AppsFolder\\" + w.Aumid : w.ExePath;
+                    string lnk = useAumid ? null : ShellUtil.ShortcutForIconless(w.ExePath);
+                    if (lnk != null)
+                    {
+                        // Helper binary without an icon (e.g. NoMachine's nxplayer.bin): borrow the app's shortcut.
+                        iconSource = lnk;
+                        item.LaunchTarget = lnk;
+                        item.Name = System.IO.Path.GetFileNameWithoutExtension(lnk);
+                    }
+                    ImageSource icon = IconLoader.LoadSharp(iconSource, IconPx());
                     if (icon == null) icon = IconLoader.ForWindow(w.Hwnd);
                     BuildView(item, icon);
                     running.Add(item);
