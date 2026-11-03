@@ -256,3 +256,25 @@ caption, so they don't trigger it.
   an .exe with no icons), the dock now looks for a Start menu shortcut to the same exe or the same
   folder (`ShellUtil.ShortcutForIconless`). It uses that shortcut's icon, its name ("NoMachine"
   instead of "NoMachine Player Process"), and launches through it.
+
+## Round 7 – Windows key, local search, 1.3.0
+- Feedback: the GitHub download had no app page (the newest *release* was still 1.1.0; 1.2.x were
+  only pushed as commits). Fixed by publishing 1.3.0 as a release.
+- **Windows key → app page (and dock):** `WinKey.cs` installs a low-level keyboard hook on its own
+  thread, so a busy UI thread can't make Windows skip it. A lone Win press/release (nothing else in
+  between) opens or closes the app page. To keep the Windows Start menu closed, the hook swallows
+  that Win *release* and replays it after an unassigned key (VK 0xE8); Windows only opens Start
+  when Win comes up with nothing pressed in between. Our own injected keys carry a marker in
+  `dwExtraInfo` and pass straight through. Win+R, Win+E, Win+Shift+S etc. are untouched. Tested:
+  Win toggles the page, Start never appears, Win+R opens Run.
+  - The page is activated right after our own injected input, so Windows lets it take focus.
+  - The dock is held up (`DockWindow.HoldShown`) and raised above the page while it's open.
+- **Search: apps, Settings and files, with nothing from the web.** While typing, the pages are
+  replaced by sections:
+  - Applications (up to two rows).
+  - Settings (`SettingsCatalog`: ~75 `ms-settings:` pages matched by name and keywords, e.g.
+    "blue" → Bluetooth & devices and Night light).
+  - Files & Folders, from the local Windows Search index (`Search.CollatorDSO` over OLE DB, scoped
+    to the user profile; AppData, dot-folders and node_modules are skipped). Queries run on a
+    background thread with a short debounce, and only the newest query's results are shown.
+  - Enter opens the top result. Right-click a file → Show in File Explorer.

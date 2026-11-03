@@ -161,6 +161,10 @@ namespace MacBar
         // Bottom margin keeps the page dots above the dock.
         readonly StackPanel dots = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 10, 0, 110) };
         readonly Dictionary<AppEntry, Image> images = new Dictionary<AppEntry, Image>();
+        readonly StackPanel results = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top };
+        readonly StackPanel fileSection = new StackPanel();
+        Action topResult; // what Enter opens
+        static ImageSource settingsIcon;
         List<AppEntry> shown = new List<AppEntry>();
         int cols = 7, rows = 5, page, pageCount;
         double cellW = CellW, cellH = CellH;
@@ -188,7 +192,7 @@ namespace MacBar
             // Search pill
             var pill = new Border
             {
-                Width = 280, Height = 32, CornerRadius = new CornerRadius(9), Margin = new Thickness(0, 64, 0, 28), HorizontalAlignment = HorizontalAlignment.Center,
+                Width = 340, Height = 34, CornerRadius = new CornerRadius(9), Margin = new Thickness(0, 64, 0, 28), HorizontalAlignment = HorizontalAlignment.Center,
                 Background = new SolidColorBrush(Color.FromArgb(0x2E, 0xFF, 0xFF, 0xFF)), BorderBrush = new SolidColorBrush(Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF)), BorderThickness = new Thickness(1)
             };
             var sp = new DockPanel { Margin = new Thickness(10, 0, 10, 0) };
@@ -196,7 +200,7 @@ namespace MacBar
             DockPanel.SetDock(glass, Dock.Left);
             sp.Children.Add(glass);
             var field = new Grid();
-            placeholder = new TextBlock { Text = "Search", FontSize = 14, Foreground = new SolidColorBrush(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF)), VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
+            placeholder = new TextBlock { Text = "Search apps, settings and files", FontSize = 14, Foreground = new SolidColorBrush(Color.FromArgb(0x90, 0xFF, 0xFF, 0xFF)), VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
             search = new TextBox { FontSize = 14, Foreground = Brushes.White, CaretBrush = Brushes.White, Background = Brushes.Transparent, BorderThickness = new Thickness(0), VerticalAlignment = VerticalAlignment.Center, SelectionBrush = new SolidColorBrush(Theme.Accent) };
             field.Children.Add(placeholder); field.Children.Add(search);
             sp.Children.Add(field);
@@ -207,6 +211,10 @@ namespace MacBar
             pagesHost.Children.Add(pages);
             Grid.SetRow(pagesHost, 1);
             content.Children.Add(pagesHost);
+            // Search results (apps, Settings pages, files) replace the pages while typing.
+            results.Visibility = Visibility.Collapsed;
+            Grid.SetRow(results, 1);
+            content.Children.Add(results);
             Grid.SetRow(dots, 2);
             content.Children.Add(dots);
             root.Children.Add(content);
@@ -325,7 +333,7 @@ namespace MacBar
                 if (search.Text.Length > 0) search.Text = ""; else Dismiss();
                 e.Handled = true;
             }
-            else if (e.Key == Key.Enter && shown.Count > 0) { Launch(shown[0]); e.Handled = true; }
+            else if (e.Key == Key.Enter && topResult != null) { topResult(); e.Handled = true; }
             else if ((e.Key == Key.Right || e.Key == Key.PageDown) && search.Text.Length == 0) { SetPage(page + 1, true); e.Handled = true; }
             else if ((e.Key == Key.Left || e.Key == Key.PageUp) && search.Text.Length == 0) { SetPage(page - 1, true); e.Handled = true; }
         }
@@ -334,7 +342,15 @@ namespace MacBar
         {
             var all = AppCatalog.Apps;
             string q = search.Text.Trim();
-            if (q.Length == 0) shown = all;
+            if (q.Length == 0)
+            {
+                shown = all;
+                results.Visibility = Visibility.Collapsed;
+                pagesHost.Visibility = Visibility.Visible;
+                topResult = shown.Count > 0 ? (Action)delegate { Launch(shown[0]); } : null;
+                FileSearch.Query("", 0, Dispatcher, delegate { });
+                BuildPages();
+            }
             else
             {
                 // Best matches first: name starts with the query, then a word starts with it, then contains it.
@@ -346,8 +362,83 @@ namespace MacBar
                     return n.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0 ? 2 : 3;
                 };
                 shown = all.Select(a => new { a, r = rank(a) }).Where(x => x.r < 3).OrderBy(x => x.r).Select(x => x.a).ToList();
+                BuildResults(q);
             }
-            BuildPages();
+        }
+
+        // ---------- search results: Applications / Settings / Files & Folders ----------
+
+        void BuildResults(string q)
+        {
+            images.Clear();
+            results.Children.Clear();
+            pagesHost.Visibility = Visibility.Collapsed;
+            dots.Visibility = Visibility.Hidden;
+            results.Visibility = Visibility.Visible;
+            topResult = null;
+
+            var apps = shown.Take(cols * 2).ToList();
+            if (apps.Count > 0)
+            {
+                topResult = delegate { Launch(apps[0]); };
+                results.Children.Add(Section("Applications", apps.Select(a => Tile(a)).ToList()));
+            }
+
+            var setPages = SettingsCatalog.Search(q, cols);
+            if (setPages.Count > 0)
+            {
+                if (settingsIcon == null)
+                    settingsIcon = IconLoader.LoadSharp("shell:AppsFolder\\windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel", IconPx());
+                if (topResult == null) topResult = delegate { OpenTarget(setPages[0].Uri); };
+                results.Children.Add(Section("Settings", setPages.Select(p =>
+                    MakeTile(settingsIcon, p.Name, delegate { OpenTarget(p.Uri); }, null)).ToList()));
+            }
+
+            fileSection.Children.Clear();
+            results.Children.Add(fileSection);
+            var none = new TextBlock { Text = "No Results", FontSize = 18, Foreground = new SolidColorBrush(Color.FromArgb(0xA0, 0xFF, 0xFF, 0xFF)), HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 120, 0, 0) };
+            if (apps.Count == 0 && setPages.Count == 0) results.Children.Insert(0, none);
+
+            FileSearch.Query(q, cols, Dispatcher, delegate (string forQuery, List<FileHit> hits)
+            {
+                if (forQuery != search.Text.Trim() || hits.Count == 0) return;
+                results.Children.Remove(none);
+                if (topResult == null) topResult = delegate { OpenTarget(hits[0].Path); };
+                fileSection.Children.Add(Section(hits.Count > 0 && hits.All(h => h.IsFolder) ? "Folders" : "Files & Folders", hits.Select(h =>
+                    MakeTile(IconLoader.LoadSharp(h.Path, IconPx()), h.Name, delegate { OpenTarget(h.Path); }, m =>
+                    {
+                        var show = new MenuItem { Header = "Show in File Explorer" };
+                        show.Click += delegate { System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + h.Path + "\""); Dismiss(); };
+                        m.Items.Add(show);
+                    })).ToList()));
+            });
+        }
+
+        FrameworkElement Section(string title, List<FrameworkElement> tiles)
+        {
+            var sp = new StackPanel { Width = cols * cellW, Margin = new Thickness(0, 0, 0, 14) };
+            sp.Children.Add(new TextBlock
+            {
+                Text = title, FontSize = 15, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromArgb(0xD0, 0xFF, 0xFF, 0xFF)),
+                Margin = new Thickness(14, 0, 0, 2)
+            });
+            sp.Children.Add(new Border { Height = 1, Background = new SolidColorBrush(Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF)), Margin = new Thickness(14, 4, 14, 6) });
+            var grid = new UniformGrid { Columns = cols, HorizontalAlignment = HorizontalAlignment.Left };
+            foreach (var t in tiles) { t.Height = Math.Min(cellH, 120); t.Width = cellW; grid.Children.Add(t); }
+            sp.Children.Add(grid);
+            return sp;
+        }
+
+        int IconPx()
+        {
+            var src = PresentationSource.FromVisual(App.Instance.MainBar);
+            return (int)Math.Round(IconDip * (src != null ? src.CompositionTarget.TransformToDevice.M11 : 1));
+        }
+
+        void OpenTarget(string target)
+        {
+            ShellUtil.Open(target);
+            Dismiss();
         }
 
         void BuildPages()
@@ -378,29 +469,46 @@ namespace MacBar
 
         FrameworkElement Tile(AppEntry a)
         {
-            var img = new Image { Width = IconDip, Height = IconDip, Source = a.Icon, Effect = new DropShadowEffect { BlurRadius = 10, ShadowDepth = 2, Opacity = 0.35 } };
-            RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
+            Image img;
+            var tile = MakeTile(a.Icon, a.Name, delegate { Launch(a); }, m =>
+            {
+                var keep = new MenuItem { Header = "Keep in Dock" }; keep.Click += delegate { App.Instance.PinApp(AppCatalog.ToPin(a)); };
+                m.Items.Add(keep);
+            }, out img);
             images[a] = img;
+            return tile;
+        }
+
+        FrameworkElement MakeTile(ImageSource icon, string name, Action open, Action<ContextMenu> extraMenu)
+        {
+            Image img;
+            return MakeTile(icon, name, open, extraMenu, out img);
+        }
+
+        FrameworkElement MakeTile(ImageSource icon, string name, Action open, Action<ContextMenu> extraMenu, out Image img)
+        {
+            img = new Image { Width = IconDip, Height = IconDip, Source = icon, Effect = new DropShadowEffect { BlurRadius = 10, ShadowDepth = 2, Opacity = 0.35 } };
+            RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
             var label = new TextBlock
             {
-                Text = a.Name, FontSize = 13, Foreground = Brushes.White, TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis,
+                Text = name, FontSize = 13, Foreground = Brushes.White, TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis,
                 Width = cellW - 18, Margin = new Thickness(0, 8, 0, 0)
             };
             var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
             stack.Children.Add(img); stack.Children.Add(label);
-            var tile = new Border { Child = stack, Padding = new Thickness(6, 10, 6, 8), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, CornerRadius = new CornerRadius(16), Background = Brushes.Transparent, Cursor = Cursors.Hand, ToolTip = a.Name };
+            var tile = new Border { Child = stack, Padding = new Thickness(6, 10, 6, 8), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, CornerRadius = new CornerRadius(16), Background = Brushes.Transparent, Cursor = Cursors.Hand, ToolTip = name };
             ToolTipService.SetInitialShowDelay(tile, 900);
             tile.MouseEnter += delegate { tile.Background = new SolidColorBrush(Color.FromArgb(0x1C, 0xFF, 0xFF, 0xFF)); };
             tile.MouseLeave += delegate { tile.Background = Brushes.Transparent; tile.Opacity = 1; };
             tile.MouseLeftButtonDown += delegate { tile.Opacity = 0.65; };
-            tile.MouseLeftButtonUp += delegate (object s, MouseButtonEventArgs e) { e.Handled = true; tile.Opacity = 1; Launch(a); };
+            tile.MouseLeftButtonUp += delegate (object s, MouseButtonEventArgs e) { e.Handled = true; tile.Opacity = 1; open(); };
             tile.MouseRightButtonUp += delegate (object s, MouseButtonEventArgs e)
             {
                 e.Handled = true;
                 var m = new ContextMenu();
-                var open = new MenuItem { Header = "Open" }; open.Click += delegate { Launch(a); };
-                var keep = new MenuItem { Header = "Keep in Dock" }; keep.Click += delegate { App.Instance.PinApp(AppCatalog.ToPin(a)); };
-                m.Items.Add(open); m.Items.Add(keep);
+                var o = new MenuItem { Header = "Open" }; o.Click += delegate { open(); };
+                m.Items.Add(o);
+                if (extraMenu != null) extraMenu(m);
                 m.IsOpen = true;
             };
             return tile;

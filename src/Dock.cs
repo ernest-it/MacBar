@@ -130,6 +130,15 @@ namespace MacBar
         DateTime lastWanted = DateTime.Now;
         bool menuOpen, overlapCache; DateTime overlapCheckedAt;
 
+        /// <summary>Keeps the dock up (e.g. while the app page is open from the Windows key).</summary>
+        public bool HoldShown;
+
+        /// <summary>Puts the dock back on top of other topmost windows (the app page).</summary>
+        public void BringToFront()
+        {
+            if (Hwnd != IntPtr.Zero) Native.SetWindowPos(Hwnd, Native.HWND_TOPMOST, 0, 0, 0, 0, Native.SWP_NOSIZE | Native.SWP_NOACTIVATE | 0x0002 /* NOMOVE */);
+        }
+
         void Place()
         {
             double e = progress * progress * (3 - 2 * progress); // smoothstep
@@ -148,7 +157,7 @@ namespace MacBar
                 int sw = Native.GetSystemMetrics(0), sh = Native.GetSystemMetrics(1);
                 bool atEdge = p.Y >= sh - 2 && p.Y < sh + 2 && p.X >= 0 && p.X < sw;
                 bool overDock = progress < 0.6 && p.X >= baseX - 12 && p.X <= baseX + pxW + 12 && p.Y >= baseY - 16 && p.Y < sh + 2;
-                bool busy = menuOpen || dragging || pressed != null;
+                bool busy = menuOpen || dragging || pressed != null || HoldShown;
                 bool wantShown = atEdge || overDock || busy;
                 if (mode == 2 && !wantShown) wantShown = !OverlapsFocusedWindow();
                 if (wantShown) lastWanted = DateTime.Now;

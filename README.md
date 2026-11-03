@@ -8,8 +8,8 @@ while it runs and puts it back when you quit.
 - App icons only, centered; the dock grows and shrinks with the number of apps
 - Pinned apps (imported from your Windows taskbar pins on first run), running apps after a divider
 - Running-app dots, hover zoom, launch bounce, drag to reorder pinned apps
-- **Apps** button (first in the dock) opens a Launchpad-style app page: every installed app in a
-  paged grid over a blurred backdrop, with instant search (Enter opens the top result), mouse-wheel /
+- **Apps** button (first in the dock) or the **Windows key** opens a Launchpad-style app page (the dock comes up with it): every installed app in a
+  paged grid over a blurred backdrop, with instant search across apps, Settings pages and your files (local only: no Bing, no web results; Enter opens the top result), mouse-wheel /
   arrow-key paging, and right-click → Keep in Dock
 - Auto-hides like macOS (slides back up when the cursor hits the bottom edge), or Ubuntu-style only when a window overlaps it
 - Click: launch / focus / minimize / cycle windows. Right-click: window list, Keep in Dock,

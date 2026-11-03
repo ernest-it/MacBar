@@ -9,8 +9,8 @@ using Microsoft.Win32;
 [assembly: System.Reflection.AssemblyTitle("MacBar")]
 [assembly: System.Reflection.AssemblyProduct("MacBar")]
 [assembly: System.Reflection.AssemblyDescription("macOS-style menu bar and dock for Windows")]
-[assembly: System.Reflection.AssemblyVersion("1.2.1.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.2.1.0")]
+[assembly: System.Reflection.AssemblyVersion("1.3.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.3.0.0")]
 
 namespace MacBar
 {
@@ -78,6 +78,8 @@ namespace MacBar
             dock = new DockWindow(S);
             dock.Show();
             Weather.Refresh();
+            // A lone Windows key press opens the app page instead of the Windows Start menu.
+            WinKey.Start(Dispatcher, delegate { if (!cleanedUp) ToggleAppsPage(); });
 
             // Warm up the app page's list and icons in the background so it opens instantly.
             var warm = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
@@ -172,7 +174,17 @@ namespace MacBar
         LaunchpadWindow launchpad;
         public void ToggleAppsPage()
         {
-            if (launchpad == null) launchpad = new LaunchpadWindow();
+            if (launchpad == null)
+            {
+                launchpad = new LaunchpadWindow();
+                // The dock comes up with the app page and stays above it, like the Windows key bringing up the taskbar.
+                launchpad.IsVisibleChanged += delegate
+                {
+                    dock.HoldShown = launchpad.IsVisible;
+                    if (launchpad.IsVisible) dock.BringToFront();
+                };
+                launchpad.Activated += delegate { dock.BringToFront(); };
+            }
             launchpad.Toggle();
         }
 
@@ -205,6 +217,7 @@ namespace MacBar
         {
             if (cleanedUp) return;
             cleanedUp = true;
+            try { WinKey.Stop(); } catch { }
             try { if (top != null) top.ReleaseAppBar(); } catch { }
             try { if (dock != null) dock.ReleaseAppBar(); } catch { }
             try { if (trayRunning) tray.Stop(); } catch { }
