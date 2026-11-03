@@ -110,6 +110,9 @@ namespace MacBar
         /// <summary>Icon size in real screen pixels, so icons are drawn 1:1 without extra scaling blur.</summary>
         int IconPx() { return (int)Math.Round(S.IconSize * Scale); }
 
+        /// <summary>Pixels reserved at the bottom of the primary screen (0 unless "reserve space" is on).</summary>
+        public int ReservedPx;
+
         public override void Reposition()
         {
             if (Hwnd == IntPtr.Zero || ActualWidth <= 0) return;
@@ -121,6 +124,7 @@ namespace MacBar
             if (!AppBar.Registered) AppBar.Register(Hwnd);
             bool reserve = S.DockReservesSpace && S.DockAutoHide == 0;
             int thick = reserve ? h + gap * 2 : 0;
+            ReservedPx = thick;
             RECT rc = AppBar.SetPos(AppBar.ABE_BOTTOM, new RECT { Left = 0, Top = sh - thick, Right = sw, Bottom = sh }, thick);
             int bottom = reserve ? rc.Bottom : sh;
             baseX = (sw - w) / 2; baseY = bottom - gap - h; pxW = w; pxH = h; pxGap = gap;

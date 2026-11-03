@@ -281,6 +281,9 @@ namespace MacBar
             OnForeground(IntPtr.Zero, 3, Native.GetForegroundWindow(), 0, 0, 0, 0);
         }
 
+        /// <summary>Pixels reserved at the top of the primary screen (0 when windows may use the whole screen).</summary>
+        public int ReservedPx;
+
         public override void Reposition()
         {
             if (Hwnd == IntPtr.Zero) return;
@@ -290,6 +293,7 @@ namespace MacBar
             if (!AppBar.Registered) AppBar.Register(Hwnd);
             // Thickness 0 = registered (for full-screen notifications) but windows may use the whole screen.
             int thick = S.MenuBarReservesSpace ? hpx : 0;
+            ReservedPx = thick;
             AppBar.SetPos(AppBar.ABE_TOP, new RECT { Left = 0, Top = 0, Right = sw, Bottom = thick }, thick);
             Width = sw / sc;
             Height = BarHeight;

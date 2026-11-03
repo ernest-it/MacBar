@@ -290,3 +290,15 @@ caption, so they don't trigger it.
   - `DWMWA_WINDOW_CORNER_PREFERENCE`: only rounds to a fixed ~8 px, plus a system shadow.
   The dock now skips the system blur and draws only its rounded tint, 15 points denser when blur is
   on. The menu bar is a full-width rectangle, so it keeps its blur.
+- **Desktop icons under the menu bar again:** the desktop work area had no strip for the menu bar,
+  even though MacBar's app bar was registered and positioned. The 1.2.0 build behaved the same, so
+  it wasn't a code regression. With its taskbar hidden, Explorer recalculates the work area lazily
+  and on this build leaves our top app bar out.
+  - Every time anything announced a work-area change system-wide, Explorer recalculated and wiped
+    the strip again, within about 2 s.
+  - Fix: `App.EnsureWorkArea()` runs every 2 s and after settings changes. If the work area doesn't
+    match (menu bar strip on top, dock strip at the bottom when reserved), it sets it with
+    `SPI_SETWORKAREA` *without* a broadcast and sends `WM_SETTINGCHANGE` only to the desktop window,
+    so the icons move.
+  - Tested from a wiped work area: corrected once at startup, then stable.
+  - On quit the full screen is given back before the Windows taskbar returns.

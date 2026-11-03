@@ -111,6 +111,7 @@ namespace MacBar
             var watchdog = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             watchdog.Tick += delegate
             {
+                EnsureWorkArea();
                 IntPtr real = Native.FindRealTray(tray.Hwnd);
                 if (real == IntPtr.Zero || real == lastRealTray) return;
                 lastRealTray = real;
@@ -124,6 +125,31 @@ namespace MacBar
             var fullscreenTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
             fullscreenTimer.Tick += delegate { CheckFullscreen(); };
             fullscreenTimer.Start();
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool SystemParametersInfo(int action, int param, ref RECT r, int flags);
+        const int SPI_GETWORKAREA = 0x30, SPI_SETWORKAREA = 0x2F, SPIF_SENDCHANGE = 2;
+
+        /// <summary>
+        /// Explorer is supposed to shrink the desktop work area for our app bars, but with its own taskbar
+        /// hidden it recalculates lazily and can end up with no strip (desktop icons under the menu bar)
+        /// or a stale one. So check it ourselves and set it when it's wrong.
+        /// </summary>
+        void EnsureWorkArea()
+        {
+            if (top == null || dock == null || cleanedUp) return;
+            int sw = Native.GetSystemMetrics(0), sh = Native.GetSystemMetrics(1);
+            var want = new RECT { Left = 0, Top = top.ReservedPx, Right = sw, Bottom = sh - dock.ReservedPx };
+            var cur = new RECT();
+            SystemParametersInfo(SPI_GETWORKAREA, 0, ref cur, 0);
+            if (cur.Left == want.Left && cur.Top == want.Top && cur.Right == want.Right && cur.Bottom == want.Bottom) return;
+            App.Trace(string.Format("work area {0},{1}-{2},{3} -> {4},{5}-{6},{7}", cur.Left, cur.Top, cur.Right, cur.Bottom, want.Left, want.Top, want.Right, want.Bottom));
+            // Set it quietly: a system-wide change broadcast makes Explorer recalculate (and drop our strip
+            // again). Then tell only the desktop, so its icons move out from under the menu bar.
+            SystemParametersInfo(SPI_SETWORKAREA, 0, ref want, 0);
+            IntPtr r;
+            foreach (var desk in new[] { Native.GetShellWindow(), Native.FindWindowEx(IntPtr.Zero, IntPtr.Zero, "Progman", null) })
+                if (desk != IntPtr.Zero) Native.SendMessageTimeout(desk, 0x001A /* WM_SETTINGCHANGE */, new IntPtr(SPI_SETWORKAREA), IntPtr.Zero, 2, 500, out r);
         }
 
         bool fullscreenNow;
@@ -160,6 +186,7 @@ namespace MacBar
             dock.ApplyAppearance();
             dock.RebuildPinned();
             dock.Reposition();
+            EnsureWorkArea();
         }
 
         public void OnFullscreen(bool fullscreen)
@@ -218,6 +245,13 @@ namespace MacBar
             if (cleanedUp) return;
             cleanedUp = true;
             try { WinKey.Stop(); } catch { }
+            // Give the screen back before the Windows taskbar returns and reserves its own strip.
+            try
+            {
+                var full = new RECT { Left = 0, Top = 0, Right = Native.GetSystemMetrics(0), Bottom = Native.GetSystemMetrics(1) };
+                SystemParametersInfo(SPI_SETWORKAREA, 0, ref full, SPIF_SENDCHANGE);
+            }
+            catch { }
             try { if (top != null) top.ReleaseAppBar(); } catch { }
             try { if (dock != null) dock.ReleaseAppBar(); } catch { }
             try { if (trayRunning) tray.Stop(); } catch { }

@@ -192,6 +192,7 @@ namespace MacBar
             if (hasLast && d.rc.Left == last.Left && d.rc.Top == last.Top && d.rc.Right == last.Right && d.rc.Bottom == last.Bottom)
                 return last;
             Native.SHAppBarMessage(ABM_SETPOS, ref d);
+            App.Trace(string.Format("appbar SETPOS edge {0}: {1},{2}-{3},{4}", edge, d.rc.Left, d.rc.Top, d.rc.Right, d.rc.Bottom));
             last = d.rc; hasLast = true;
             return last;
         }
