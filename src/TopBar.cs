@@ -93,6 +93,7 @@ namespace MacBar
     public class TopBar : BarWindow
     {
         public const double BarHeight = 28;
+        static readonly ScaleTransform GlyphScale = new ScaleTransform(0.92, 0.92);
         readonly TrayHost tray;
         readonly WeatherService weather;
         readonly AudioController audio = new AudioController();
@@ -173,7 +174,7 @@ namespace MacBar
             left.Margin = new Thickness(6, 0, 0, 0); right.Margin = new Thickness(0, 0, 6, 0);
 
             logoItem = Item(Glyphs.Logo());
-            ((FrameworkElement)logoItem.Child).VerticalAlignment = VerticalAlignment.Center;
+            ((FrameworkElement)logoItem.Child).VerticalAlignment = VerticalAlignment.Center; ((FrameworkElement)logoItem.Child).LayoutTransform = GlyphScale;
             logoItem.Padding = new Thickness(10, 0, 10, 0);
             logoItem.MouseLeftButtonUp += delegate { App.Trace("logo click"); ShowSystemMenu(); };
             left.Children.Add(logoItem);
@@ -193,7 +194,7 @@ namespace MacBar
             weatherItem = Item(wp);
             weatherItem.MouseLeftButtonUp += delegate
             {
-                if (Flyout.JustClosed("weather")) return;
+                if (Flyout.ToggleOff("weather")) return;
                 new WeatherFlyout(weather, delegate { App.Instance.ShowSettings(); }).ShowBelow(weatherItem);
             };
             right.Children.Add(weatherItem);
@@ -202,7 +203,7 @@ namespace MacBar
             wifiItem = Item(null);
             wifiItem.MouseLeftButtonUp += delegate
             {
-                if (Flyout.JustClosed("wifi")) return;
+                if (Flyout.ToggleOff("wifi")) return;
                 if (!WifiControl.HasAdapter) { ShellUtil.Open("ms-settings:network"); return; }
                 new WifiFlyout(delegate { PollStatus(true); }).ShowBelow(wifiItem);
             };
@@ -211,7 +212,7 @@ namespace MacBar
             soundItem = Item(null);
             soundItem.MouseLeftButtonUp += delegate
             {
-                if (Flyout.JustClosed("volume") || !audio.Available) return;
+                if (Flyout.ToggleOff("volume") || !audio.Available) return;
                 new VolumeFlyout(audio, delegate { PollStatus(true); }).ShowBelow(soundItem);
             };
             soundItem.MouseWheel += delegate (object o, MouseWheelEventArgs e)
@@ -232,20 +233,21 @@ namespace MacBar
             batteryItem.MouseLeftButtonUp += delegate { ShellUtil.Open("ms-settings:batterysaver"); };
             right.Children.Add(batteryItem);
 
+            // Date and time share one button, like macOS ("Mon Nov 3  11:14 PM").
             dateText = Label("", false);
             timeText = Label("", false);
-            dateItem = Item(dateText);
-            timeItem = Item(timeText);
-            dateItem.Margin = new Thickness(4, 3, 0, 3);
+            timeText.Margin = new Thickness(8, 0, 0, 0);
+            var clock = new StackPanel { Orientation = Orientation.Horizontal };
+            clock.Children.Add(dateText); clock.Children.Add(timeText);
+            dateItem = timeItem = Item(clock);
+            dateItem.Margin = new Thickness(4, 3, 1, 3);
             MouseButtonEventHandler openCalendar = delegate
             {
-                if (Flyout.JustClosed("calendar")) return;
+                if (Flyout.ToggleOff("calendar")) return;
                 new CalendarFlyout().ShowBelow(timeItem);
             };
             dateItem.MouseLeftButtonUp += openCalendar;
-            timeItem.MouseLeftButtonUp += openCalendar;
             right.Children.Add(dateItem);
-            right.Children.Add(timeItem);
 
             PollStatus(true);
             UpdateClock();
@@ -358,7 +360,7 @@ namespace MacBar
                 soundItem.Visibility = audio.Available ? Visibility.Visible : Visibility.Collapsed;
                 int waves = audio.Volume < 0.01 ? 0 : audio.Volume < 0.34 ? 1 : audio.Volume < 0.67 ? 2 : 3;
                 var g = Glyphs.Speaker(waves, audio.Muted);
-                g.VerticalAlignment = VerticalAlignment.Center;
+                g.VerticalAlignment = VerticalAlignment.Center; g.LayoutTransform = GlyphScale;
                 soundItem.Child = g;
                 soundItem.ToolTip = audio.Muted ? "Sound: muted" : "Volume: " + Math.Round(audio.Volume * 100) + "%";
             }
@@ -380,7 +382,7 @@ namespace MacBar
                     g = Glyphs.Wifi(0, false);
                     wifiItem.ToolTip = net.HasWifiAdapter ? "Wi-Fi: not connected" : "No network connection";
                 }
-                g.VerticalAlignment = VerticalAlignment.Center;
+                g.VerticalAlignment = VerticalAlignment.Center; g.LayoutTransform = GlyphScale;
                 wifiItem.Child = g;
             }
             if (battery.Poll() || force)
@@ -389,7 +391,7 @@ namespace MacBar
                 var bp = (StackPanel)batteryItem.Child;
                 while (bp.Children.Count > 1) bp.Children.RemoveAt(1);
                 var g = Glyphs.Battery(battery.Percent, battery.Charging);
-                g.VerticalAlignment = VerticalAlignment.Center;
+                g.VerticalAlignment = VerticalAlignment.Center; g.LayoutTransform = GlyphScale;
                 bp.Children.Add(g);
                 batteryText.Text = battery.Percent + "%";
                 batteryText.Visibility = S.ShowBatteryPercent ? Visibility.Visible : Visibility.Collapsed;

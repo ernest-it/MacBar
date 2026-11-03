@@ -46,9 +46,9 @@ namespace MacBar
             return c;
         }
 
-        public static FrameworkElement Speaker(int waves, bool muted)
+        public static FrameworkElement Speaker(int waves, bool muted, Brush color = null)
         {
-            var b = Theme.Fg;
+            Brush b = color ?? Theme.Fg;
             var c = Box(21, 14);
             c.Children.Add(Fill("M1.5,4.8 H4.6 L8.8,1.2 V12.8 L4.6,9.2 H1.5 Z", b));
             if (muted)
@@ -56,7 +56,8 @@ namespace MacBar
                 c.Children.Add(Stroke("M12,4.6 L16.8,9.4 M16.8,4.6 L12,9.4", b, 1.6));
                 return c;
             }
-            var faint = Theme.FgAlpha(0x45);
+            Brush faint = Theme.FgAlpha(0x45);
+            if (color != null) { faint = color.Clone(); faint.Opacity = 0.3; }
             c.Children.Add(Stroke("M11.2,4.6 Q12.8,7 11.2,9.4", waves >= 1 ? b : faint, 1.5));
             c.Children.Add(Stroke("M13.6,2.8 Q16.4,7 13.6,11.2", waves >= 2 ? b : faint, 1.5));
             c.Children.Add(Stroke("M16,1 Q20,7 16,13", waves >= 3 ? b : faint, 1.5));

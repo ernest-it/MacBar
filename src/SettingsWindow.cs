@@ -84,7 +84,8 @@ namespace MacBar
 
             Header("Dock");
             Row("Icon size", SliderWithValue(32, 72, s.IconSize, " px", v => s.IconSize = v));
-            Check("Keep maximized windows above the dock", s.DockReservesSpace, v => s.DockReservesSpace = v);
+            Row("Hide the dock", Combo(new[] { "Never", "Always (like macOS)", "When a window overlaps it" }, s.DockAutoHide, i => s.DockAutoHide = i));
+            Check("Keep maximized windows above the dock (when it isn't hidden)", s.DockReservesSpace, v => s.DockReservesSpace = v);
 
             Header("Menu bar");
             Check("Keep windows and desktop icons below the menu bar", s.MenuBarReservesSpace, v => s.MenuBarReservesSpace = v);

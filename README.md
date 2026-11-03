@@ -8,15 +8,17 @@ while it runs and puts it back when you quit.
 - App icons only, centered; the dock grows and shrinks with the number of apps
 - Pinned apps (imported from your Windows taskbar pins on first run), running apps after a divider
 - Running-app dots, hover zoom, launch bounce, drag to reorder pinned apps
+- Auto-hides like macOS (slides back up when the cursor hits the bottom edge), or Ubuntu-style only when a window overlaps it
 - Click: launch / focus / minimize / cycle windows. Right-click: window list, Keep in Dock,
   Remove from Dock, New Window, Show in File Explorer, Quit
 
 **Menu bar (top)**
 - Left: system menu (About, Settings, Task Manager, Sleep, Restart, Shut Down, Lock, Log Out)
   and the active app's name in bold
-- Right, in order: tray icons → weather → Wi‑Fi → sound → battery (laptops only) → date → time
+- Right, in order: tray icons → weather → Wi‑Fi → sound → battery (laptops only) → date & time (one button)
+- Click an icon again to close its panel
 - **Wi‑Fi** panel: on/off switch, current network, known and other networks, connect/disconnect
-- **Sound** panel: volume slider, mute, output device; scroll over the icon to change volume
+- **Sound** panel: volume slider, mute, output device switcher; scroll over the icon to change volume
 - **Calendar** panel: today's date, month calendar, shortcuts to notifications and Do Not Disturb
 - **Weather**: current conditions + 6-day forecast from [Open-Meteo](https://open-meteo.com) (no API key,
   no Windows location access; pick your city in Settings; °F or °C; refreshes every 30 min; works offline

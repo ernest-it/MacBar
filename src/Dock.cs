@@ -25,6 +25,10 @@ namespace MacBar
 
         public bool Matches(AppWindow w)
         {
+            // Windows 11's File Explorer pin only has an AUMID, while Explorer windows usually have none.
+            if (string.Equals(Aumid, "Microsoft.Windows.Explorer", StringComparison.OrdinalIgnoreCase) &&
+                w.ExePath != null && w.ExePath.EndsWith("\\explorer.exe", StringComparison.OrdinalIgnoreCase))
+                return true;
             if (!string.IsNullOrEmpty(Aumid) && !string.IsNullOrEmpty(w.Aumid))
                 return string.Equals(Aumid, w.Aumid, StringComparison.OrdinalIgnoreCase);
             return !string.IsNullOrEmpty(ExePath) && !string.IsNullOrEmpty(w.ExePath) &&
@@ -72,6 +76,10 @@ namespace MacBar
             var poll = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
             poll.Tick += delegate { Refresh(); };
             poll.Start();
+
+            var autoHide = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(16) };
+            autoHide.Tick += delegate { AutoHideTick(); };
+            autoHide.Start();
         }
 
         void OnWinEvent(IntPtr hook, uint evt, IntPtr hwnd, int idObject, int idChild, uint thread, uint time)
@@ -94,6 +102,9 @@ namespace MacBar
 
         double Radius() { return Math.Round((S.IconSize + 14) * 0.32); }
 
+        /// <summary>Icon size in real screen pixels, so icons are drawn 1:1 without extra scaling blur.</summary>
+        int IconPx() { return (int)Math.Round(S.IconSize * Scale); }
+
         public override void Reposition()
         {
             if (Hwnd == IntPtr.Zero || ActualWidth <= 0) return;
@@ -103,11 +114,66 @@ namespace MacBar
             int gap = (int)Math.Round(GapDip * sc);
             // Always registered so we hear about full-screen apps; thickness 0 when not reserving space.
             if (!AppBar.Registered) AppBar.Register(Hwnd);
-            int thick = S.DockReservesSpace ? h + gap * 2 : 0;
+            bool reserve = S.DockReservesSpace && S.DockAutoHide == 0;
+            int thick = reserve ? h + gap * 2 : 0;
             RECT rc = AppBar.SetPos(AppBar.ABE_BOTTOM, new RECT { Left = 0, Top = sh - thick, Right = sw, Bottom = sh }, thick);
-            int bottom = S.DockReservesSpace ? rc.Bottom : sh;
-            Native.SetWindowPos(Hwnd, Native.HWND_TOPMOST, (sw - w) / 2, bottom - gap - h, 0, 0, Native.SWP_NOSIZE | Native.SWP_NOACTIVATE);
+            int bottom = reserve ? rc.Bottom : sh;
+            baseX = (sw - w) / 2; baseY = bottom - gap - h; pxW = w; pxH = h; pxGap = gap;
+            Place();
             Theme.SetRegion(Hwnd, w, h, (int)Math.Round(Radius() * sc));
+        }
+
+        // ---------- auto-hide ----------
+        // progress: 0 = fully shown, 1 = fully hidden below the screen edge.
+        int baseX, baseY, pxW, pxH, pxGap;
+        double progress, target;
+        DateTime lastWanted = DateTime.Now;
+        bool menuOpen, overlapCache; DateTime overlapCheckedAt;
+
+        void Place()
+        {
+            double e = progress * progress * (3 - 2 * progress); // smoothstep
+            int y = baseY + (int)Math.Round(e * (pxH + pxGap + 4));
+            Native.SetWindowPos(Hwnd, Native.HWND_TOPMOST, baseX, y, 0, 0, Native.SWP_NOSIZE | Native.SWP_NOACTIVATE);
+        }
+
+        void AutoHideTick()
+        {
+            if (Hwnd == IntPtr.Zero || pxW == 0) return;
+            int mode = S.DockAutoHide;
+            bool hide = false;
+            if (mode != 0)
+            {
+                POINT p; Native.GetCursorPos(out p);
+                int sw = Native.GetSystemMetrics(0), sh = Native.GetSystemMetrics(1);
+                bool atEdge = p.Y >= sh - 2 && p.Y < sh + 2 && p.X >= 0 && p.X < sw;
+                bool overDock = progress < 0.6 && p.X >= baseX - 12 && p.X <= baseX + pxW + 12 && p.Y >= baseY - 16 && p.Y < sh + 2;
+                bool busy = menuOpen || dragging || pressed != null;
+                bool wantShown = atEdge || overDock || busy;
+                if (mode == 2 && !wantShown) wantShown = !OverlapsFocusedWindow();
+                if (wantShown) lastWanted = DateTime.Now;
+                // short delay before hiding so the dock doesn't flicker when the mouse brushes past
+                hide = !wantShown && (DateTime.Now - lastWanted).TotalMilliseconds > (mode == 2 ? 150 : 450);
+            }
+            target = hide ? 1 : 0;
+            if (progress == target) return;
+            double step = 0.016 / 0.18; // ~180 ms slide
+            progress = target > progress ? Math.Min(target, progress + step) : Math.Max(target, progress - step);
+            Place();
+        }
+
+        /// <summary>Intellihide: is the focused, non-minimized app window overlapping the dock's area?</summary>
+        bool OverlapsFocusedWindow()
+        {
+            if ((DateTime.Now - overlapCheckedAt).TotalMilliseconds < 250) return overlapCache;
+            overlapCheckedAt = DateTime.Now;
+            IntPtr fg = Native.GetForegroundWindow();
+            if (fg == IntPtr.Zero || Native.GetPid(fg) == (uint)System.Diagnostics.Process.GetCurrentProcess().Id) return overlapCache;
+            string cls = Native.GetClass(fg);
+            if (cls == "Progman" || cls == "WorkerW" || Native.IsIconic(fg)) { overlapCache = false; return false; }
+            RECT r; Native.GetWindowRect(fg, out r);
+            overlapCache = r.Right > baseX && r.Left < baseX + pxW && r.Bottom > baseY && r.Top < baseY + pxH;
+            return overlapCache;
         }
 
         // ---------- model ----------
@@ -120,7 +186,7 @@ namespace MacBar
             {
                 var item = new DockItem { Pin = pin, Aumid = pin.Aumid, ExePath = pin.ExePath, Name = pin.Name, LaunchTarget = pin.Target };
                 item.IsUwp = !string.IsNullOrEmpty(pin.Aumid) && string.IsNullOrEmpty(pin.ExePath);
-                BuildView(item, IconLoader.Load(pin.Target, 96));
+                BuildView(item, IconLoader.LoadSharp(pin.Target, IconPx()));
                 pinned.Add(item);
             }
             foreach (var r in running) BuildView(r, r.Img.Source);
@@ -142,7 +208,7 @@ namespace MacBar
                     bool useAumid = w.IsUwp && !string.IsNullOrEmpty(w.Aumid);
                     item.LaunchTarget = useAumid ? "shell:AppsFolder\\" + w.Aumid : w.ExePath;
                     item.Name = w.IsUwp ? w.Title : (AppNames.ForExe(w.ExePath) ?? w.Title);
-                    ImageSource icon = useAumid ? IconLoader.Load("shell:AppsFolder\\" + w.Aumid, 96) : IconLoader.Load(w.ExePath, 96);
+                    ImageSource icon = IconLoader.LoadSharp(useAumid ? "shell:AppsFolder\\" + w.Aumid : w.ExePath, IconPx());
                     if (icon == null) icon = IconLoader.ForWindow(w.Hwnd);
                     BuildView(item, icon);
                     running.Add(item);
@@ -284,6 +350,8 @@ namespace MacBar
         void ShowMenu(DockItem item, FrameworkElement anchor)
         {
             var m = new ContextMenu { PlacementTarget = anchor, Placement = System.Windows.Controls.Primitives.PlacementMode.Top };
+            m.Opened += delegate { menuOpen = true; };
+            m.Closed += delegate { menuOpen = false; };
             foreach (var w in item.Windows)
             {
                 var win = w;

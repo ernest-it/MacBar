@@ -248,6 +248,72 @@ namespace MacBar
             return img;
         }
 
+        /// <summary>
+        /// Crisp icon at an exact pixel size: takes the largest (256 px) shell icon and downsamples it once
+        /// with GDI+ high-quality bicubic, so WPF displays it 1:1 instead of scaling twice.
+        /// </summary>
+        public static ImageSource LoadSharp(string parsingName, int px)
+        {
+            if (string.IsNullOrEmpty(parsingName) || px <= 0) return null;
+            string key = parsingName + "|sharp|" + px;
+            ImageSource img;
+            if (cache.TryGetValue(key, out img)) return img;
+            var big = Load(parsingName, 256) as BitmapSource;
+            if (big == null) return null;
+            try { img = Resample(big, px); } catch { img = big; }
+            cache[key] = img;
+            return img;
+        }
+
+        static BitmapSource Resample(BitmapSource src, int px)
+        {
+            if (src.Format != PixelFormats.Pbgra32) src = new FormatConvertedBitmap(src, PixelFormats.Pbgra32, null, 0);
+            int w = src.PixelWidth, h = src.PixelHeight;
+            var bits = new byte[w * h * 4];
+            src.CopyPixels(bits, w * 4, 0);
+
+            // Old apps without a big icon come back as a small icon in the corner of a 256 canvas; crop to it.
+            int minX = w, minY = h, maxX = -1, maxY = -1;
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    if (bits[(y * w + x) * 4 + 3] > 8) { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y; }
+            var srcRect = new System.Drawing.Rectangle(0, 0, w, h);
+            if (maxX >= 0)
+            {
+                int cw = maxX - minX + 1, ch = maxY - minY + 1;
+                if (Math.Max(cw, ch) <= w / 3)
+                {
+                    int side = Math.Max(cw, ch) <= 16 ? 16 : Math.Max(cw, ch) <= 32 ? 32 : 48;
+                    srcRect = new System.Drawing.Rectangle(minX, minY, Math.Min(side, w - minX), Math.Min(side, h - minY));
+                }
+            }
+
+            using (var sb = new System.Drawing.Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+            using (var db = new System.Drawing.Bitmap(px, px, System.Drawing.Imaging.PixelFormat.Format32bppPArgb))
+            {
+                var sd = sb.LockBits(new System.Drawing.Rectangle(0, 0, w, h), System.Drawing.Imaging.ImageLockMode.WriteOnly, sb.PixelFormat);
+                for (int y = 0; y < h; y++) Marshal.Copy(bits, y * w * 4, sd.Scan0 + y * sd.Stride, w * 4);
+                sb.UnlockBits(sd);
+                using (var g = System.Drawing.Graphics.FromImage(db))
+                using (var ia = new System.Drawing.Imaging.ImageAttributes())
+                {
+                    g.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceCopy;
+                    g.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+                    g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                    g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                    ia.SetWrapMode(System.Drawing.Drawing2D.WrapMode.TileFlipXY);
+                    g.DrawImage(sb, new System.Drawing.Rectangle(0, 0, px, px), srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height, System.Drawing.GraphicsUnit.Pixel, ia);
+                }
+                var dd = db.LockBits(new System.Drawing.Rectangle(0, 0, px, px), System.Drawing.Imaging.ImageLockMode.ReadOnly, db.PixelFormat);
+                var outBits = new byte[px * px * 4];
+                for (int y = 0; y < px; y++) Marshal.Copy(dd.Scan0 + y * dd.Stride, outBits, y * px * 4, px * 4);
+                db.UnlockBits(dd);
+                var result = BitmapSource.Create(px, px, 96, 96, PixelFormats.Pbgra32, null, outBits, px * 4);
+                result.Freeze();
+                return result;
+            }
+        }
+
         public static ImageSource ForWindow(IntPtr h)
         {
             IntPtr icon;

@@ -11,7 +11,7 @@ namespace MacBar
     [ComImport, Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     interface IMMDeviceEnumerator
     {
-        [PreserveSig] int EnumAudioEndpoints(int flow, int mask, out IntPtr devices);
+        [PreserveSig] int EnumAudioEndpoints(int flow, int mask, out IMMDeviceCollection devices);
         [PreserveSig] int GetDefaultAudioEndpoint(int flow, int role, out IMMDevice dev);
     }
 
@@ -41,8 +41,70 @@ namespace MacBar
         [PreserveSig] int GetMute([MarshalAs(UnmanagedType.Bool)] out bool mute);
     }
 
+    [ComImport, Guid("0BD7A1BE-7A1A-44DB-8397-CC5392387B5E"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IMMDeviceCollection
+    {
+        [PreserveSig] int GetCount(out uint count);
+        [PreserveSig] int Item(uint index, out IMMDevice device);
+    }
+
+    // Undocumented but long-stable interface that the Windows sound settings use to change the default device.
+    [ComImport, Guid("870af99c-171d-4f9e-af0d-e63df40c2bc9")] class PolicyConfigClient { }
+
+    [ComImport, Guid("f8679f50-850a-41cf-9c72-430f290290c8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    interface IPolicyConfig
+    {
+        [PreserveSig] int GetMixFormat(); [PreserveSig] int GetDeviceFormat(); [PreserveSig] int ResetDeviceFormat();
+        [PreserveSig] int SetDeviceFormat(); [PreserveSig] int GetProcessingPeriod(); [PreserveSig] int SetProcessingPeriod();
+        [PreserveSig] int GetShareMode(); [PreserveSig] int SetShareMode(); [PreserveSig] int GetPropertyValue();
+        [PreserveSig] int SetPropertyValue();
+        [PreserveSig] int SetDefaultEndpoint([MarshalAs(UnmanagedType.LPWStr)] string deviceId, int role);
+    }
+
+    public class AudioOutput { public string Id, Name; public bool IsDefault; }
+
     public class AudioController
     {
+        /// <summary>Active playback devices.</summary>
+        public System.Collections.Generic.List<AudioOutput> Outputs()
+        {
+            var result = new System.Collections.Generic.List<AudioOutput>();
+            try
+            {
+                if (enumerator == null) enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorCo();
+                IMMDeviceCollection col;
+                if (enumerator.EnumAudioEndpoints(0, 1 /* DEVICE_STATE_ACTIVE */, out col) != 0 || col == null) return result;
+                uint n; col.GetCount(out n);
+                for (uint i = 0; i < n; i++)
+                {
+                    IMMDevice d;
+                    if (col.Item(i, out d) != 0 || d == null) continue;
+                    string id; d.GetId(out id);
+                    string name = "";
+                    IPropertyStore ps;
+                    if (d.OpenPropertyStore(0, out ps) == 0 && ps != null) { name = Native.ReadString(ps, FriendlyName) ?? ""; Marshal.ReleaseComObject(ps); }
+                    result.Add(new AudioOutput { Id = id, Name = string.IsNullOrEmpty(name) ? "Unknown device" : name, IsDefault = id == deviceId });
+                    Marshal.ReleaseComObject(d);
+                }
+                Marshal.ReleaseComObject(col);
+            }
+            catch { }
+            return result;
+        }
+
+        /// <summary>Makes a device the default for all roles (console, multimedia, communications).</summary>
+        public void SetDefault(string id)
+        {
+            try
+            {
+                var pc = (IPolicyConfig)new PolicyConfigClient();
+                for (int role = 0; role < 3; role++) pc.SetDefaultEndpoint(id, role);
+                Marshal.ReleaseComObject(pc);
+            }
+            catch { }
+            Poll();
+        }
+
         public bool Available; public float Volume; public bool Muted; public string DeviceName = "";
         IMMDeviceEnumerator enumerator;
         IAudioEndpointVolume endpoint;

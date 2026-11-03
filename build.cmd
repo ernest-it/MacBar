@@ -7,7 +7,7 @@ set WPF=%FW%\WPF
 cd /d "%~dp0"
 if not exist bin mkdir bin
 
-set REFS=/r:"%WPF%\PresentationCore.dll" /r:"%WPF%\PresentationFramework.dll" /r:"%WPF%\WindowsBase.dll" /r:"%FW%\System.Xaml.dll" /r:"%FW%\System.Web.Extensions.dll" /r:System.dll /r:System.Core.dll /r:System.Xml.dll
+set REFS=/r:"%WPF%\PresentationCore.dll" /r:"%WPF%\PresentationFramework.dll" /r:"%WPF%\WindowsBase.dll" /r:"%FW%\System.Xaml.dll" /r:"%FW%\System.Web.Extensions.dll" /r:System.dll /r:System.Core.dll /r:System.Xml.dll /r:System.Drawing.dll
 
 set ICON=
 if exist assets\MacBar.ico set ICON=/win32icon:assets\MacBar.ico

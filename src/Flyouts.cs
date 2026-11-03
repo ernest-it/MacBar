@@ -43,6 +43,17 @@ namespace MacBar
             return closedAt.TryGetValue(key, out t) && (DateTime.Now - t).TotalMilliseconds < 350;
         }
 
+        /// <summary>
+        /// Call from an icon's click handler. Returns true (and closes the panel) when this click should
+        /// just close the panel: it's already open, or it closed a moment ago because of this same click.
+        /// Clicking the bar doesn't take focus, so an open panel doesn't close itself first.
+        /// </summary>
+        public static bool ToggleOff(string key)
+        {
+            if (open != null && open.key == key && open.IsVisible) { open.Close(); return true; }
+            return JustClosed(key);
+        }
+
         public void ShowBelow(FrameworkElement anchor)
         {
             if (open != null) open.Close();
@@ -146,12 +157,47 @@ namespace MacBar
             slider.ValueChanged += delegate (double v) { audio.SetVolume((float)v); refresh(); onChange(); };
             row.Children.Add(muteHost); row.Children.Add(pct); row.Children.Add(slider);
             Body.Children.Add(row);
-            if (!string.IsNullOrEmpty(audio.DeviceName))
+            // Output switcher (macOS-style list; the selected device gets a blue badge).
+            var outputs = new StackPanel();
+            Action buildOutputs = null;
+            buildOutputs = delegate
             {
-                var dev = Text(audio.DeviceName, 12, FontWeights.Normal, 0.6);
-                dev.Margin = new Thickness(0, 6, 0, 0);
-                Body.Children.Add(dev);
-            }
+                outputs.Children.Clear();
+                var list = audio.Outputs();
+                if (list.Count == 0) return;
+                var head = Text("Output", 11, FontWeights.SemiBold, 0.55);
+                head.Margin = new Thickness(0, 4, 0, 2);
+                outputs.Children.Add(head);
+                foreach (var o in list)
+                {
+                    var dev = o;
+                    var r = new DockPanel();
+                    var badge = new Border
+                    {
+                        Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Margin = new Thickness(0, 0, 10, 0),
+                        Background = dev.IsDefault ? new SolidColorBrush(Theme.Accent) : Theme.FgAlpha(0x22),
+                        Child = new Viewbox { Width = 14, Height = 11, Child = Glyphs.Speaker(2, false, dev.IsDefault ? Brushes.White : null) }
+                    };
+                    r.Children.Add(badge);
+                    var name = Text(dev.Name, 13, dev.IsDefault ? FontWeights.SemiBold : FontWeights.Normal, 1);
+                    name.VerticalAlignment = VerticalAlignment.Center;
+                    r.Children.Add(name);
+                    var host = new Border { Child = r, CornerRadius = new CornerRadius(6), Padding = new Thickness(6, 3, 6, 3), Margin = new Thickness(-6, 1, -6, 1), Background = Brushes.Transparent, Cursor = Cursors.Hand };
+                    host.MouseEnter += delegate { host.Background = Theme.Hover; };
+                    host.MouseLeave += delegate { host.Background = Brushes.Transparent; };
+                    host.MouseLeftButtonUp += delegate
+                    {
+                        if (dev.IsDefault) return;
+                        audio.SetDefault(dev.Id);
+                        slider.Value = audio.Volume;
+                        refresh(); onChange(); buildOutputs();
+                    };
+                    outputs.Children.Add(host);
+                }
+            };
+            buildOutputs();
+            Body.Children.Add(Separator());
+            Body.Children.Add(outputs);
             Body.Children.Add(Separator());
             Body.Children.Add(Link("Sound Settings…", delegate { ShellUtil.Open("ms-settings:sound"); }));
             Body.Children.Add(Link("Volume Mixer…", delegate { ShellUtil.Open("ms-settings:apps-volume"); }));

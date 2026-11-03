@@ -144,3 +144,29 @@ caption, so they don't trigger it.
       (Win+N) and "Do Not Disturb…" buttons instead of a list.
 - Installer built and tested with `/quiet` install + uninstall (files, shortcuts, registry
   entries all created and removed).
+- Published v1.0.0 to GitHub.
+
+### 2026-11-03 — feedback round 3 (v1.1.0)
+- *Icons look a little blown up* → default dock icon size 48 → 44 px (existing settings migrated
+  via a new `SettingsVersion` field), menu-bar glyphs scaled to 92 %.
+- *Icon quality* → the dock used to ask the shell for 96 px icons and let WPF shrink them, i.e. two
+  resampling passes. Now `IconLoader.LoadSharp` takes the 256 px icon and downsamples it **once**
+  with GDI+ high-quality bicubic to the exact on-screen pixel size, so WPF draws it 1:1. Old apps
+  that only have small icons come back as a small image in the corner of a 256 canvas; those are
+  detected (content ≤ 1/3 of the canvas) and cropped first.
+- *Sound has no output switcher* → the sound panel lists active playback devices
+  (`IMMDeviceEnumerator.EnumAudioEndpoints`) with the current one highlighted. Switching uses
+  `IPolicyConfig.SetDefaultEndpoint` for all three roles. It's undocumented, but it's what Windows'
+  own sound settings use and has been stable since Windows 7.
+- *Date and time should be one button* → merged into a single item ("Tue Nov 3  12:05 AM").
+- *Clicking an icon again should close its panel* → clicking the bar doesn't activate MacBar, so an
+  open panel never lost focus and the click opened a fresh copy. `Flyout.ToggleOff(key)` closes
+  the open panel instead.
+- *Taskbar not automatically hiding* → the dock now auto-hides like macOS by default: it slides
+  below the screen edge (~180 ms smoothstep) and comes back when the cursor touches the bottom
+  edge of the primary screen. It stays up while hovered, while a dock menu is open, or while
+  dragging. Settings → "Hide the dock": Never / Always (macOS) / When a window overlaps it
+  (Ubuntu-style "intellihide": hides only when the focused window covers the dock area).
+- Bug: open File Explorer windows showed up as a separate dock icon because the Windows 11
+  Explorer pin has only an AUMID and Explorer windows have none. Special-cased in `DockItem.Matches`.
+- Repo: removed the Claude co-author trailer from history at the user's request.

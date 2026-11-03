@@ -19,7 +19,9 @@ namespace MacBar
         public int Opacity { get; set; }           // 0-100 tint opacity for both bars
         public int Blur { get; set; }              // 0 none, 1 light, 2 strong
         public int IconSize { get; set; }          // dock icon size (DIP)
-        public bool DockReservesSpace { get; set; }    // maximized windows stop above the dock
+        public bool DockReservesSpace { get; set; }    // maximized windows stop above the dock (only when auto-hide is off)
+        public int DockAutoHide { get; set; }          // 0 never, 1 always (macOS), 2 when a window overlaps (intellihide)
+        public int SettingsVersion { get; set; }
         public bool MenuBarReservesSpace { get; set; } // maximized windows stop below the menu bar
         public bool ShowTrayIcons { get; set; }
         public bool ShowBatteryPercent { get; set; }
@@ -36,7 +38,7 @@ namespace MacBar
 
         public Settings()
         {
-            Theme = "Auto"; Opacity = 20; Blur = 1; IconSize = 48;
+            Theme = "Auto"; Opacity = 20; Blur = 1; IconSize = 44; DockAutoHide = 1;
             MenuBarReservesSpace = true; DockReservesSpace = false;
             ShowTrayIcons = true; ShowBatteryPercent = true;
             Fahrenheit = true; WeatherLocation = ""; Pinned = new List<PinnedApp>();
@@ -58,12 +60,21 @@ namespace MacBar
                         s.Opacity = Math.Max(0, Math.Min(100, s.Opacity));
                         s.Blur = Math.Max(0, Math.Min(2, s.Blur));
                         s.IconSize = Math.Max(28, Math.Min(80, s.IconSize));
+                        s.DockAutoHide = Math.Max(0, Math.Min(2, s.DockAutoHide));
+                        if (s.SettingsVersion < 2)
+                        {
+                            // v2: slightly smaller default icons, dock auto-hides by default.
+                            if (s.IconSize == 48) s.IconSize = 44;
+                            s.DockAutoHide = 1;
+                            s.SettingsVersion = 2;
+                            s.Save();
+                        }
                         return s;
                     }
                 }
             }
             catch { }
-            return new Settings();
+            return new Settings { SettingsVersion = 2 };
         }
 
         public void Save()
