@@ -178,8 +178,32 @@ namespace MacBar
 
         // ---------- model ----------
 
+        FrameworkElement appsButton;
+
+        /// <summary>Launchpad-style "Apps" button, always first in the dock; opens the full-screen app page.</summary>
+        FrameworkElement BuildAppsButton()
+        {
+            double size = S.IconSize;
+            double space = Math.Round(S.IconSize * 0.14);
+            var icon = AppsIcon.Create(size);
+            var scale = new ScaleTransform(1, 1);
+            icon.RenderTransform = scale; icon.RenderTransformOrigin = new Point(0.5, 1);
+            var stack = new StackPanel { Margin = new Thickness(space / 2 + 1, 0, space / 2 + 1, 0), Background = Brushes.Transparent, Cursor = Cursors.Hand };
+            stack.Children.Add(icon);
+            stack.Children.Add(new Ellipse { Width = 4, Height = 4, Margin = new Thickness(0, 2, 0, 0), Visibility = Visibility.Hidden }); // keeps alignment with app icons
+            stack.ToolTip = "Apps";
+            ToolTipService.SetPlacement(stack, System.Windows.Controls.Primitives.PlacementMode.Top);
+            ToolTipService.SetInitialShowDelay(stack, 250);
+            ToolTipService.SetVerticalOffset(stack, -4);
+            stack.MouseEnter += delegate { Animate(scale, 1.1); };
+            stack.MouseLeave += delegate { Animate(scale, 1.0); };
+            stack.MouseLeftButtonUp += delegate { App.Instance.ToggleAppsPage(); };
+            return stack;
+        }
+
         public void RebuildPinned()
         {
+            appsButton = BuildAppsButton();
             foreach (var p in pinned) p.Windows.Clear();
             pinned.Clear();
             foreach (var pin in S.Pinned)
@@ -219,6 +243,7 @@ namespace MacBar
 
             // Sync the visual tree only when the sequence actually changed.
             var desired = new List<UIElement>();
+            if (appsButton != null) desired.Add(appsButton);
             foreach (var p in pinned) desired.Add(p.View);
             if (running.Count > 0 && pinned.Count > 0) desired.Add(separator);
             foreach (var r in running) desired.Add(r.View);

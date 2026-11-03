@@ -205,3 +205,28 @@ caption, so they don't trigger it.
     the 0.92 scale transform, which itself was blurring things.
   - Dock: shrinking 256 → 44 px loses edge contrast; added a light 3×3 unsharp mask after the
     bicubic downsample (color clamped to alpha because the pixels are premultiplied).
+- Published v1.1.0.
+
+### 2026-11-03 — feedback round 5: app page + dock Apps button (v1.2.0)
+(The user clarified they did *not* want a new app switcher; Windows' Alt+Tab stays.)
+- **App page** (`Launchpad.cs`), modeled on macOS Launchpad:
+  - App list = the shell's `shell:AppsFolder` (same source as Start → All apps, covers Store and
+    desktop apps), read through `Shell.Application` COM on a background STA thread. Uninstallers,
+    readmes, help files and web links are filtered out; duplicates by name dropped; sorted A–Z.
+  - Icons load on that thread too (the icon cache got a lock), and the list is pre-warmed 6 s after
+    startup so the page opens instantly. Only the resized 72 px icons are cached; caching the 256 px
+    originals for ~300 apps would cost ~75 MB.
+  - Full-screen window with acrylic blur + dark tint, search pill (live filter ranked: starts-with →
+    word-starts-with → contains; Enter opens the top hit), paged grid that fills the screen (9 columns
+    on ultrawide, 7 otherwise, up to 5 rows), page dots above the dock, wheel/arrow/PgUp/PgDn paging
+    with a slide animation, zoom/fade in and out, Esc clears search then closes, clicking empty space
+    closes (checked by walking up from the clicked element, because the search box is made of Grids
+    too). Right-click an app → Open / Keep in Dock (desktop apps' `{KnownFolder}\path.exe` is expanded
+    via `SHGetKnownFolderPath` so the new pin matches running windows).
+- **Apps button**: first item in the dock, a vector tile with a 3×3 grid of colored squares; toggles
+  the app page.
+- **Icon fix (also fixes a dark square in the dock):** for apps that only ship small icons, asking the
+  shell for 256 px returns either a solid plate or (Bambu Studio, Cisco Packet Tracer, ASUS DriverHub…)
+  a *faint white outline frame* around an empty square with the icon tiny in the middle. `Padding()`
+  detects both; framed → always use the 48 px icon, plated → use 48 px only if it isn't the same plate
+  (some real icons are solid squares). Icons with no alpha channel now treat pure black as transparent.

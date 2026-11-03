@@ -9,8 +9,8 @@ using Microsoft.Win32;
 [assembly: System.Reflection.AssemblyTitle("MacBar")]
 [assembly: System.Reflection.AssemblyProduct("MacBar")]
 [assembly: System.Reflection.AssemblyDescription("macOS-style menu bar and dock for Windows")]
-[assembly: System.Reflection.AssemblyVersion("1.1.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.1.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.2.0.0")]
 
 namespace MacBar
 {
@@ -78,6 +78,17 @@ namespace MacBar
             dock = new DockWindow(S);
             dock.Show();
             Weather.Refresh();
+
+            // Warm up the app page's list and icons in the background so it opens instantly.
+            var warm = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+            warm.Tick += delegate
+            {
+                warm.Stop();
+                var src = PresentationSource.FromVisual(top);
+                double sc = src != null ? src.CompositionTarget.TransformToDevice.M11 : 1;
+                AppCatalog.Refresh(Dispatcher, (int)Math.Round(72 * sc));
+            };
+            warm.Start();
 
             SystemEvents.UserPreferenceChanged += delegate (object o, UserPreferenceChangedEventArgs ev)
             {
@@ -154,6 +165,23 @@ namespace MacBar
             var v = fullscreen ? Visibility.Hidden : Visibility.Visible;
             if (top != null) top.Visibility = v;
             if (dock != null) dock.Visibility = v;
+        }
+
+        public Window MainBar { get { return top; } }
+
+        LaunchpadWindow launchpad;
+        public void ToggleAppsPage()
+        {
+            if (launchpad == null) launchpad = new LaunchpadWindow();
+            launchpad.Toggle();
+        }
+
+        public void PinApp(PinnedApp pin)
+        {
+            if (S.Pinned.Exists(p => string.Equals(p.Target, pin.Target, StringComparison.OrdinalIgnoreCase))) return;
+            S.Pinned.Add(pin);
+            S.Save();
+            dock.RebuildPinned();
         }
 
         public void ShowSettings()

@@ -219,12 +219,19 @@ namespace MacBar
         static readonly Dictionary<string, ImageSource> cache = new Dictionary<string, ImageSource>(StringComparer.OrdinalIgnoreCase);
         static readonly Guid IID_Factory = new Guid("bcc18b79-ba16-442f-80c4-8a59c30c463b");
 
-        public static ImageSource Load(string parsingName, int px)
+        static readonly object gate = new object(); // icons are also loaded on the app page's background thread
+
+        static bool TryCached(string key, out ImageSource img) { lock (gate) return cache.TryGetValue(key, out img); }
+        static void Store(string key, ImageSource img) { lock (gate) cache[key] = img; }
+
+        public static ImageSource Load(string parsingName, int px) { return Load(parsingName, px, true); }
+
+        static ImageSource Load(string parsingName, int px, bool keep)
         {
             if (string.IsNullOrEmpty(parsingName)) return null;
             string key = parsingName + "|" + px;
             ImageSource img;
-            if (cache.TryGetValue(key, out img)) return img;
+            if (TryCached(key, out img)) return img;
             img = null;
             try
             {
@@ -244,9 +251,11 @@ namespace MacBar
                 }
             }
             catch { }
-            if (img != null) cache[key] = img;
+            if (img != null && keep) Store(key, img);
             return img;
         }
+
+        public static bool IsCached(string parsingName, int px) { ImageSource i; return TryCached(parsingName + "|sharp|" + px, out i); }
 
         /// <summary>
         /// Crisp icon at an exact pixel size: takes the largest (256 px) shell icon and downsamples it once
@@ -257,11 +266,21 @@ namespace MacBar
             if (string.IsNullOrEmpty(parsingName) || px <= 0) return null;
             string key = parsingName + "|sharp|" + px;
             ImageSource img;
-            if (cache.TryGetValue(key, out img)) return img;
-            var big = Load(parsingName, 256) as BitmapSource;
+            if (TryCached(key, out img)) return img;
+            var big = Load(parsingName, 256, false) as BitmapSource; // only the resized copy is cached
             if (big == null) return null;
+            // Apps that only ship small icons get drawn by Windows on a dark square "plate" at 256 px.
+            // If the 48 px version is a normal icon, prefer it.
+            int kind = Padding(big);
+            if (kind != 0)
+            {
+                var small = Load(parsingName, 48, false) as BitmapSource;
+                // A framed 256 px image always means the small icon is the real one; for a solid plate,
+                // only switch if the small icon isn't the same plate (some real icons are solid squares).
+                if (small != null && (kind == 2 || Padding(small) == 0)) big = small;
+            }
             try { img = Resample(big, px); } catch { img = big; }
-            cache[key] = img;
+            Store(key, img);
             return img;
         }
 
@@ -315,6 +334,55 @@ namespace MacBar
                 result.Freeze();
                 return result;
             }
+        }
+
+        /// <summary>0 = normal icon, 1 = opaque near-uniform square plate behind it, 2 = faint outline frame with the icon tiny in the middle.</summary>
+        static int Padding(BitmapSource src)
+        {
+            if (src.Format != PixelFormats.Pbgra32) src = new FormatConvertedBitmap(src, PixelFormats.Pbgra32, null, 0);
+            int w = src.PixelWidth, h = src.PixelHeight;
+            if (w < 16 || h < 16) return 0;
+            var px = new byte[w * h * 4];
+            src.CopyPixels(px, w * 4, 0);
+            int inset0 = Math.Max(1, (int)(w * 0.06)), inset1 = Math.Max(inset0 + 1, (int)(w * 0.12));
+            int n = 0, opaque = 0; double sum = 0, sumSq = 0;
+            for (int y = inset0; y < h - inset0; y += 2)
+                for (int x = inset0; x < w - inset0; x += 2)
+                {
+                    bool band = x < inset1 || y < inset1 || x >= w - inset1 || y >= h - inset1;
+                    if (!band) continue;
+                    int i = (y * w + x) * 4;
+                    n++;
+                    if (px[i + 3] < 230) continue;
+                    opaque++;
+                    double lum = 0.11 * px[i] + 0.59 * px[i + 1] + 0.3 * px[i + 2];
+                    sum += lum; sumSq += lum * lum;
+                }
+            if (n > 0 && opaque >= n * 0.9)
+            {
+                double mean = sum / opaque, sd = Math.Sqrt(Math.Max(0, sumSq / opaque - mean * mean));
+                if (sd < 10) return 1;
+            }
+            return LooksFramed(px, w, h) ? 2 : 0;
+        }
+
+        /// <summary>
+        /// The other way Windows pads small icons: a faint (semi-transparent) outline around the edge,
+        /// an empty interior, and the real icon tiny in the middle.
+        /// </summary>
+        static bool LooksFramed(byte[] px, int w, int h)
+        {
+            int edge = 0, faint = 0, inner = 0, empty = 0;
+            int i0 = (int)(w * 0.10), i1 = (int)(w * 0.25);
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    int a = px[(y * w + x) * 4 + 3];
+                    int d = Math.Min(Math.Min(x, y), Math.Min(w - 1 - x, h - 1 - y));
+                    if (d <= 3) { edge++; if (a >= 20 && a <= 160) faint++; }
+                    else if (d >= i0 && d < i1) { inner++; if (a < 8) empty++; }
+                }
+            return edge > 0 && inner > 0 && faint > edge * 0.5 && empty > inner * 0.95;
         }
 
         /// <summary>Unsharp mask (3x3) on premultiplied BGRA; alpha is left unchanged.</summary>
@@ -374,7 +442,13 @@ namespace MacBar
             finally { Native.ReleaseDC(IntPtr.Zero, dc); }
             bool anyAlpha = false;
             for (int i = 3; i < bits.Length; i += 4) if (bits[i] != 0) { anyAlpha = true; break; }
-            if (!anyAlpha) for (int i = 3; i < bits.Length; i += 4) bits[i] = 255;
+            if (!anyAlpha)
+            {
+                // Legacy icons without an alpha channel come back on a black background: treat pure black
+                // as transparent so the icon can be cropped and shown without a dark square around it.
+                for (int i = 0; i < bits.Length; i += 4)
+                    bits[i + 3] = (byte)(bits[i] == 0 && bits[i + 1] == 0 && bits[i + 2] == 0 ? 0 : 255);
+            }
             var bs = BitmapSource.Create(w, h, 96, 96, PixelFormats.Pbgra32, null, bits, w * 4);
             bs.Freeze();
             return bs;
