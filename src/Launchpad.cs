@@ -74,6 +74,7 @@ namespace MacBar
 
         static List<AppEntry> Enumerate()
         {
+            if (Demo.On) return Demo.Apps();
             var result = new List<AppEntry>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             object shell = Activator.CreateInstance(Type.GetTypeFromProgID("Shell.Application"));

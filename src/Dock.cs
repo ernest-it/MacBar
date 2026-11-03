@@ -239,6 +239,7 @@ namespace MacBar
         {
             if (dragging) return;
             var wins = WindowTracker.GetAppWindows();
+            if (Demo.On) wins.Clear(); // no real running apps in screenshots
             foreach (var i in pinned) i.Windows.Clear();
             foreach (var i in running) i.Windows.Clear();
             foreach (var w in wins)

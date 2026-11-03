@@ -133,7 +133,7 @@ namespace MacBar
         {
             int gen = Interlocked.Increment(ref generation);
             q = q.Trim();
-            if (q.Length < 2) { done(q, new List<FileHit>()); return; }
+            if (q.Length < 2 || Demo.On) { done(q, new List<FileHit>()); return; } // never show real files in demo screenshots
             ThreadPool.QueueUserWorkItem(delegate
             {
                 Thread.Sleep(120); // debounce while typing

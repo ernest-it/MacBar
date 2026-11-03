@@ -57,7 +57,7 @@ namespace MacBar
         public WeatherService(Settings s)
         {
             settings = s;
-            LoadCache();
+            if (Demo.On) Current = Demo.Weather(); else LoadCache();
             timer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(30) };
             timer.Tick += delegate { Refresh(); };
             timer.Start();
@@ -93,6 +93,7 @@ namespace MacBar
         public async void Refresh()
         {
             if (!settings.HasLocation) return;
+            if (Demo.On) { if (Updated != null) Updated(); return; }
             double lat = settings.Latitude, lon = settings.Longitude;
             string url = string.Format(CultureInfo.InvariantCulture,
                 "https://api.open-meteo.com/v1/forecast?latitude={0:0.####}&longitude={1:0.####}" +

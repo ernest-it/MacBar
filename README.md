@@ -3,6 +3,23 @@
 A macOS-style **menu bar** and **dock** for Windows 10/11. MacBar hides the Windows taskbar
 while it runs and puts it back when you quit.
 
+![MacBar: menu bar and dock](docs/screenshots/overview.png)
+
+| Control Center | Now Playing | Weather |
+|:---:|:---:|:---:|
+| ![Control Center](docs/screenshots/control-center.png) | ![Now Playing](docs/screenshots/now-playing.png) | ![Weather](docs/screenshots/weather.png) |
+
+**Dock**
+
+![Dock](docs/screenshots/dock.png)
+
+**App page** (Windows key or the Apps button), with local search across apps and Settings
+
+![App page](docs/screenshots/app-page.png)
+![Search](docs/screenshots/search.png)
+
+<sub>Screenshots were taken in demo mode (`MacBar.exe --demo`), which shows placeholder apps and content.</sub>
+
 ## Features
 **Dock (bottom)**
 - App icons only, centered; the dock grows and shrinks with the number of apps
@@ -20,6 +37,8 @@ while it runs and puts it back when you quit.
   and the active app's name in bold
 - Right, in order: tray icons → weather → Wi‑Fi → sound → battery (laptops only) → date & time (one button)
 - Click an icon again to close its panel
+- Windows' own sound, Wi‑Fi, battery, microphone and Bluetooth tray icons are left out (the menu bar and
+  Control Center already cover them); hide any other tray icon under Settings → Menu bar
 - **Wi‑Fi** panel: on/off switch, current network, known and other networks, connect/disconnect
 - **Sound** panel: volume slider, mute, output device switcher; scroll over the icon to change volume
 - **Control Center** (sliders icon next to the clock): Wi‑Fi, Bluetooth and Airplane Mode toggles,

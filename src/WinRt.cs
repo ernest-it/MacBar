@@ -146,6 +146,7 @@ namespace MacBar
         /// <summary>Current media. Pass the previous result to reuse its album art when the track hasn't changed.</summary>
         public static async Task<NowPlaying> Current(NowPlaying previous = null)
         {
+            if (Demo.On) return Demo.Track();
             var s = await Session();
             if (s == null) return null;
             try
@@ -192,6 +193,7 @@ namespace MacBar
 
         public static async Task Seek(double seconds)
         {
+            if (Demo.On) return;
             var s = await Session();
             if (s == null) return;
             try
@@ -204,6 +206,7 @@ namespace MacBar
 
         public static async Task Command(int which) // 0 prev, 1 play/pause, 2 next
         {
+            if (Demo.On) { if (which == 1) Demo.Paused = !Demo.Paused; return; }
             var s = await Session();
             if (s == null) return;
             try

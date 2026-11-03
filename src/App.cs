@@ -36,6 +36,7 @@ namespace MacBar
                 TaskbarHider.Restore(Settings.Load());
                 return 0;
             }
+            Demo.On = args.Any(a => a.Equals("--demo", StringComparison.OrdinalIgnoreCase));
             bool created;
             mutex = new Mutex(true, "Local\\MacBar.SingleInstance", out created);
             if (!created) return 0;
@@ -51,6 +52,7 @@ namespace MacBar
             Instance = this;
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             S = Settings.Load();
+            if (Demo.On) { Demo.Apply(S); Demo.ShowBackdrop(); }
             if (!S.PinsImported)
             {
                 S.Pinned = ShellUtil.ImportTaskbarPins();
@@ -197,6 +199,7 @@ namespace MacBar
         }
 
         public Window MainBar { get { return top; } }
+        public TrayHost Tray { get { return tray; } }
 
         LaunchpadWindow launchpad;
         public void ToggleAppsPage()

@@ -302,3 +302,20 @@ caption, so they don't trigger it.
     so the icons move.
   - Tested from a wiped work area: corrected once at startup, then stable.
   - On quit the full screen is given back before the Windows taskbar returns.
+
+## Round 8 – tidier menu bar, hideable tray icons, demo screenshots
+- **Duplicate tray icons removed:** Windows' own sound ("Realtek Digital Output: 100%"), microphone
+  in use, and Bluetooth Devices icons (plus network and power, if they ever appear) are skipped,
+  matched by their fixed shell GUIDs and the Bluetooth window class. The menu bar and Control Center
+  already show these. Safely Remove Hardware stays.
+- **Hide any tray icon:** Settings → Menu bar lists the current tray icons with checkboxes.
+  Unchecking one stores its key (program file name + icon GUID or id, stable across restarts) in
+  `HiddenTrayIcons`. Tested by hiding Windows Security.
+- **Demo mode (`--demo`) for README screenshots:** the real UI with placeholder content:
+  - Generated gradient app tiles in the dock and app page, and no real running apps.
+  - No tray icons and no file search results.
+  - Wi‑Fi shown as "Home Wi-Fi".
+  - A fake song (with art, progress and play/pause) and fake San Francisco weather.
+  - A gradient wallpaper window over the real desktop.
+  - Settings are never saved in demo mode.
+  - Shots are in `docs/screenshots/`; the ultrawide ones are cropped and scaled to 1600 px.

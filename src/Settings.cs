@@ -32,6 +32,7 @@ namespace MacBar
         public bool Fahrenheit { get; set; }
         public List<PinnedApp> Pinned { get; set; }
         public bool PinsImported { get; set; }
+        public List<string> HiddenTrayIcons { get; set; } // TrayIcon.Key values the user chose to hide
         // Remembers the taskbar's auto-hide state so it can be restored even after a crash.
         public bool TaskbarHidden { get; set; }
         public int SavedTaskbarState { get; set; }
@@ -41,7 +42,7 @@ namespace MacBar
             Theme = "Auto"; Opacity = 20; Blur = 1; IconSize = 44; DockAutoHide = 1;
             MenuBarReservesSpace = true; DockReservesSpace = false;
             ShowTrayIcons = true; ShowBatteryPercent = true;
-            Fahrenheit = true; WeatherLocation = ""; Pinned = new List<PinnedApp>();
+            Fahrenheit = true; WeatherLocation = ""; Pinned = new List<PinnedApp>(); HiddenTrayIcons = new List<string>();
         }
 
         public static readonly string Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "MacBar");
@@ -57,6 +58,7 @@ namespace MacBar
                     if (s != null)
                     {
                         if (s.Pinned == null) s.Pinned = new List<PinnedApp>();
+                        if (s.HiddenTrayIcons == null) s.HiddenTrayIcons = new List<string>();
                         s.Opacity = Math.Max(0, Math.Min(100, s.Opacity));
                         s.Blur = Math.Max(0, Math.Min(2, s.Blur));
                         s.IconSize = Math.Max(28, Math.Min(80, s.IconSize));
@@ -79,6 +81,7 @@ namespace MacBar
 
         public void Save()
         {
+            if (Demo.On) return; // demo mode never touches the real settings
             try
             {
                 Directory.CreateDirectory(Dir);

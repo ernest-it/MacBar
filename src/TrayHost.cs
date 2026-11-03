@@ -10,6 +10,32 @@ namespace MacBar
     {
         public IntPtr HWnd; public uint Id; public Guid Guid; public uint CallbackMessage; public uint Version;
         public ImageSource Icon; public string Tip; public bool Hidden;
+        string key, exe;
+
+        /// <summary>Owning program's file name, e.g. "securityhealthsystray.exe".</summary>
+        public string Exe
+        {
+            get
+            {
+                if (exe == null) exe = (System.IO.Path.GetFileName(Native.GetProcessPath(Native.GetPid(HWnd)) ?? "") ?? "").ToLowerInvariant();
+                return exe;
+            }
+        }
+
+        /// <summary>Stable identity across restarts (program + icon GUID or id), used to remember hidden icons.</summary>
+        public string Key { get { return key ?? (key = Exe + "|" + (Guid != Guid.Empty ? Guid.ToString() : Id.ToString())); } }
+
+        /// <summary>Friendly name for the settings list: first line of the tooltip, else the program name.</summary>
+        public string Label
+        {
+            get
+            {
+                string t = (Tip ?? "").Split('\n')[0].Trim();
+                string name = Exe.EndsWith(".exe") ? Exe.Substring(0, Exe.Length - 4) : Exe;
+                if (t.Length > 0) return t;
+                return name.Length > 0 ? char.ToUpper(name[0]) + name.Substring(1) : "Unknown app";
+            }
+        }
     }
 
     /// <summary>

@@ -139,6 +139,7 @@ namespace MacBar
     {
         public static void Open(string target)
         {
+            if (Demo.IsDemoTarget(target)) return;
             try
             {
                 if (target.StartsWith("shell:", StringComparison.OrdinalIgnoreCase))
@@ -305,6 +306,7 @@ namespace MacBar
         public static ImageSource LoadSharp(string parsingName, int px)
         {
             if (string.IsNullOrEmpty(parsingName) || px <= 0) return null;
+            if (Demo.IsDemoTarget(parsingName)) return Demo.Icon(parsingName, px);
             string key = parsingName + "|sharp|" + px;
             ImageSource img;
             if (TryCached(key, out img)) return img;

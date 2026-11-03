@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -91,6 +92,27 @@ namespace MacBar
             Check("Keep windows and desktop icons below the menu bar", s.MenuBarReservesSpace, v => s.MenuBarReservesSpace = v);
             Check("Show tray (background app) icons", s.ShowTrayIcons, v => s.ShowTrayIcons = v);
             Check("Show battery percentage", s.ShowBatteryPercent, v => s.ShowBatteryPercent = v);
+
+            // One checkbox per background-app icon currently in the menu bar (e.g. hide Windows Security).
+            var icons = App.Instance.Tray.Icons.Where(i => !i.Hidden && i.Icon != null && !TopBar.Redundant(i))
+                                               .GroupBy(i => i.Key).Select(g => g.First()).OrderBy(i => i.Label).ToList();
+            if (s.ShowTrayIcons && icons.Count > 0)
+            {
+                body.Children.Add(new TextBlock { Text = "Icons to show in the menu bar:", Margin = new Thickness(0, 8, 0, 2) });
+                foreach (var ic in icons)
+                {
+                    string key = ic.Key;
+                    var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 2, 0, 2) };
+                    var cb = new CheckBox { IsChecked = !s.HiddenTrayIcons.Contains(key), VerticalAlignment = VerticalAlignment.Center };
+                    var img = new Image { Source = ic.Icon, Width = 16, Height = 16, Margin = new Thickness(4, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
+                    var label = new TextBlock { Text = ic.Label, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 360 };
+                    cb.Checked += delegate { s.HiddenTrayIcons.Remove(key); s.Save(); Apply(); };
+                    cb.Unchecked += delegate { if (!s.HiddenTrayIcons.Contains(key)) s.HiddenTrayIcons.Add(key); s.Save(); Apply(); };
+                    label.MouseLeftButtonUp += delegate { cb.IsChecked = !cb.IsChecked; };
+                    row.Children.Add(cb); row.Children.Add(img); row.Children.Add(label);
+                    body.Children.Add(row);
+                }
+            }
 
             Header("Weather");
             var current = new TextBlock { Text = s.HasLocation ? "Location: " + s.WeatherLocation : "No location set — the weather item stays hidden until you pick one.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) };

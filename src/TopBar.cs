@@ -183,7 +183,7 @@ namespace MacBar
             logoItem.Padding = new Thickness(10, 0, 10, 0);
             logoItem.MouseLeftButtonUp += delegate { App.Trace("logo click"); ShowSystemMenu(); };
             left.Children.Add(logoItem);
-            appName = Label("", true);
+            appName = Label(Demo.On ? "Files" : "", true);
             appName.TextTrimming = TextTrimming.CharacterEllipsis;
             appName.MaxWidth = 420;
             appName.Margin = new Thickness(6, 0, 0, 0);
@@ -302,7 +302,7 @@ namespace MacBar
 
         void OnForeground(IntPtr hook, uint evt, IntPtr hwnd, int idObject, int idChild, uint thread, uint time)
         {
-            if (hwnd == IntPtr.Zero || appName == null) return;
+            if (hwnd == IntPtr.Zero || appName == null || Demo.On) return;
             if (Native.GetPid(hwnd) == (uint)System.Diagnostics.Process.GetCurrentProcess().Id) return;
             string cls = Native.GetClass(hwnd);
             if (cls == "Shell_TrayWnd" || cls == "Shell_SecondaryTrayWnd") return;
@@ -335,13 +335,30 @@ namespace MacBar
             return MessageBox.Show("Are you sure you want to " + action + " now?", "MacBar", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
         }
 
+        // Windows' own tray icons that MacBar already covers (sound, Wi-Fi, battery, microphone-in-use
+        // in the menu bar and Control Center). Matched by their fixed shell GUIDs.
+        static readonly Guid[] SystemDuplicates =
+        {
+            new Guid("7820ae73-23e3-4229-82c1-e41cb67d5b9c"), // volume
+            new Guid("7820ae74-23e3-4229-82c1-e41cb67d5b9c"), // network
+            new Guid("7820ae75-23e3-4229-82c1-e41cb67d5b9c"), // power / battery
+            new Guid("7820ae82-23e3-4229-82c1-e41cb67d5b9c"), // "app is using your microphone"
+            new Guid("6da68f06-00f1-4e6e-8158-7f1ffd4f9db9"), // Bluetooth devices
+        };
+
+        public static bool Redundant(TrayIcon ic)
+        {
+            if (Array.IndexOf(SystemDuplicates, ic.Guid) >= 0) return true;
+            return Native.GetClass(ic.HWnd) == "BluetoothNotificationAreaIconWindowClass";
+        }
+
         void RebuildTray()
         {
             trayPanel.Children.Clear();
             if (tray == null || !S.ShowTrayIcons) return;
             foreach (var ic in tray.Icons)
             {
-                if (ic.Hidden || ic.Icon == null) continue;
+                if (ic.Hidden || ic.Icon == null || Redundant(ic) || S.HiddenTrayIcons.Contains(ic.Key)) continue;
                 var icon = ic;
                 var img = new Image { Source = ic.Icon, Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center };
                 RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);

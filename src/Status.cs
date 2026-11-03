@@ -201,6 +201,7 @@ namespace MacBar
                 }
                 catch { }
             }
+            if (Demo.On && Ssid.Length > 0) Ssid = "Home Wi-Fi";
             return oc != WifiConnected || oe != Ethernet || os != Signal || oss != Ssid;
         }
 
