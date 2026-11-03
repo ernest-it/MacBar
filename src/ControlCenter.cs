@@ -53,6 +53,8 @@ namespace MacBar
             airToggle = MakeToggle("", "Airplane Mode", "…");
             conn.Children.Add(wifiToggle.Root); conn.Children.Add(btToggle.Root); conn.Children.Add(airToggle.Root);
             var connCard = MakeCard(conn);
+            connCard.Margin = new Thickness(0);
+            row1.Margin = new Thickness(0, 0, 0, 8); // gap below both columns, not just the left card
             row1.Children.Add(connCard);
 
             var right = new Grid();
@@ -135,11 +137,14 @@ namespace MacBar
 
         Border Tile(string glyph, string title, Action click)
         {
-            var sp = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            var circle = new Border { Width = 30, Height = 30, CornerRadius = new CornerRadius(15), Background = Theme.FgAlpha(0x26), Child = GlyphText(glyph, 14, Theme.Fg), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 4) };
+            // Icon beside the label (like macOS) keeps the two stacked tiles no taller than the connectivity card.
+            var sp = new DockPanel { VerticalAlignment = VerticalAlignment.Center };
+            var circle = new Border { Width = 30, Height = 30, CornerRadius = new CornerRadius(15), Background = Theme.FgAlpha(0x26), Child = GlyphText(glyph, 14, Theme.Fg), Margin = new Thickness(0, 0, 8, 0) };
+            DockPanel.SetDock(circle, Dock.Left);
             sp.Children.Add(circle);
             var t = Text(title, 12, FontWeights.SemiBold, 1);
             t.TextWrapping = TextWrapping.Wrap;
+            t.VerticalAlignment = VerticalAlignment.Center;
             sp.Children.Add(t);
             var card = MakeCard(sp);
             card.Margin = new Thickness(0);

@@ -248,3 +248,6 @@ caption, so they don't trigger it.
   - Removed the label shadows; the dark tint already makes the labels readable.
 - Measured with `MACBAR_DEBUG=1` (the log records frames per slide). After the fix, page slides run
   at ~70 fps, with at most one skipped frame.
+- Control Center: the Screen Mirroring tile touched the Display card. Only the connectivity card had
+  a bottom margin, and the stacked icon-over-label tiles made the right column the taller one. Moved
+  the gap to the row, and the tiles now put the icon beside the label (macOS layout).
