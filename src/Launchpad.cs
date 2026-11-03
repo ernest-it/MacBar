@@ -170,7 +170,10 @@ namespace MacBar
 
         public LaunchpadWindow()
         {
-            WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = Brushes.Transparent;
+            // Not a per-pixel-alpha (layered) window: at full screen those force WPF to copy every frame
+            // back to system memory, which made paging and opening stutter. Transparency comes from DWM
+            // instead (frame extended over the client area), and fades use whole-window alpha.
+            WindowStyle = WindowStyle.None; AllowsTransparency = false; Background = Brushes.Transparent;
             Topmost = true; ShowInTaskbar = false; ResizeMode = ResizeMode.NoResize;
             FontFamily = Theme.Font; UseLayoutRounding = true;
             TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
@@ -229,10 +232,42 @@ namespace MacBar
             {
                 hwnd = new WindowInteropHelper(this).Handle;
                 Native.AddExStyle(hwnd, Native.WS_EX_TOOLWINDOW);
+                HwndSource.FromHwnd(hwnd).CompositionTarget.BackgroundColor = Colors.Transparent;
+                var m = new MARGINS { L = -1, R = -1, T = -1, B = -1 };
+                DwmExtendFrameIntoClientArea(hwnd, ref m);
                 Native.SetAccent(hwnd, 4, 0x40100C0C); // acrylic blur of whatever is behind
             };
             AppCatalog.ListChanged += delegate { if (IsVisible) Filter(); };
             AppCatalog.IconsChanged += UpdateIcons;
+        }
+
+        [StructLayout(LayoutKind.Sequential)] struct MARGINS { public int L, R, T, B; }
+        [DllImport("dwmapi.dll")] static extern int DwmExtendFrameIntoClientArea(IntPtr h, ref MARGINS m);
+        double alpha;
+        EventHandler fadeTick;
+
+        // Window.Opacity only works on layered windows, so fade the content (tint, search, icons) instead.
+        void SetAlpha(double a)
+        {
+            alpha = Math.Max(0, Math.Min(1, a));
+            root.Opacity = alpha;
+        }
+
+        /// <summary>Fades the content in or out, stepped once per rendered frame.</summary>
+        void FadeTo(double to, double ms, Action done)
+        {
+            if (fadeTick != null) CompositionTarget.Rendering -= fadeTick;
+            double from = alpha;
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            fadeTick = delegate
+            {
+                double t = Math.Min(1, clock.Elapsed.TotalMilliseconds / ms);
+                SetAlpha(from + (to - from) * (1 - Math.Pow(1 - t, 3)));
+                if (t < 1) return;
+                CompositionTarget.Rendering -= fadeTick; fadeTick = null;
+                if (done != null) done();
+            };
+            CompositionTarget.Rendering += fadeTick;
         }
 
         static bool Within(DependencyObject d, DependencyObject container)
@@ -263,11 +298,11 @@ namespace MacBar
             if (AppCatalog.Apps.Count == 0 || AppCatalog.Stale) AppCatalog.Refresh(Dispatcher, (int)Math.Round(IconDip * scale));
             search.Text = "";
             Filter();
-            Opacity = 0;
+            SetAlpha(0);
             Show();
             Activate();
             search.Focus();
-            BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(160)));
+            FadeTo(1, 160, null);
             var z = new DoubleAnimation(1.06, 1, TimeSpan.FromMilliseconds(220)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
             zoom.BeginAnimation(ScaleTransform.ScaleXProperty, z);
             zoom.BeginAnimation(ScaleTransform.ScaleYProperty, z);
@@ -277,9 +312,7 @@ namespace MacBar
         {
             if (closing || !IsVisible) return;
             closing = true;
-            var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(130));
-            fade.Completed += delegate { Hide(); closing = false; };
-            BeginAnimation(OpacityProperty, fade);
+            FadeTo(0, 130, delegate { Hide(); closing = false; });
             var z = new DoubleAnimation(1.04, TimeSpan.FromMilliseconds(130));
             zoom.BeginAnimation(ScaleTransform.ScaleXProperty, z);
             zoom.BeginAnimation(ScaleTransform.ScaleYProperty, z);
@@ -322,12 +355,15 @@ namespace MacBar
             pages.Children.Clear(); images.Clear();
             int per = cols * rows;
             double hostW = Width;
+            var psrc = PresentationSource.FromVisual(App.Instance.MainBar);
+            double dpiScale = psrc != null ? psrc.CompositionTarget.TransformToDevice.M11 : 1;
             pageCount = Math.Max(1, (int)Math.Ceiling(shown.Count / (double)per));
             for (int p = 0; p < pageCount; p++)
             {
                 var grid = new UniformGrid { Columns = cols, Rows = rows, Width = cols * cellW, Height = rows * cellH, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top };
                 foreach (var a in shown.Skip(p * per).Take(per)) grid.Children.Add(Tile(a));
-                var holder = new Grid { Width = hostW, Background = Brushes.Transparent };
+                // Each page is cached as one texture, so sliding and zooming move bitmaps instead of re-drawing ~45 tiles a frame.
+                var holder = new Grid { Width = hostW, Background = Brushes.Transparent, CacheMode = new BitmapCache(dpiScale) { SnapsToDevicePixels = true } };
                 holder.Children.Add(grid);
                 pages.Children.Add(holder);
             }
@@ -348,7 +384,7 @@ namespace MacBar
             var label = new TextBlock
             {
                 Text = a.Name, FontSize = 13, Foreground = Brushes.White, TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis,
-                Width = cellW - 18, Margin = new Thickness(0, 8, 0, 0), Effect = new DropShadowEffect { BlurRadius = 4, ShadowDepth = 1, Opacity = 0.6 }
+                Width = cellW - 18, Margin = new Thickness(0, 8, 0, 0)
             };
             var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center };
             stack.Children.Add(img); stack.Children.Add(label);
@@ -393,10 +429,29 @@ namespace MacBar
         {
             page = Math.Max(0, Math.Min(pageCount - 1, p));
             double to = -page * Width;
+            if (animate && Environment.GetEnvironmentVariable("MACBAR_DEBUG") == "1") MeasureFrames("page slide", 400);
             if (animate) slide.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(to, TimeSpan.FromMilliseconds(300)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
             else { slide.BeginAnimation(TranslateTransform.XProperty, null); slide.X = to; }
             for (int i = 0; i < dots.Children.Count; i++)
                 ((System.Windows.Shapes.Ellipse)((Border)dots.Children[i]).Child).Opacity = i == page ? 1 : 0.35;
+        }
+
+        /// <summary>Debug aid: logs frame count and the longest gap between frames during an animation.</summary>
+        void MeasureFrames(string what, int ms)
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            double last = 0, worst = 0; int frames = 0;
+            EventHandler h = null;
+            h = delegate
+            {
+                double now = clock.Elapsed.TotalMilliseconds;
+                if (frames > 0) worst = Math.Max(worst, now - last);
+                last = now; frames++;
+                if (now < ms) return;
+                CompositionTarget.Rendering -= h;
+                App.Trace(string.Format("{0}: {1} frames in {2:0} ms, worst gap {3:0.0} ms", what, frames, now, worst));
+            };
+            CompositionTarget.Rendering += h;
         }
 
         void Launch(AppEntry a)

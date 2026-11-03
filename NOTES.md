@@ -230,3 +230,21 @@ caption, so they don't trigger it.
   a *faint white outline frame* around an empty square with the icon tiny in the middle. `Padding()`
   detects both; framed → always use the 48 px icon, plated → use 48 px only if it isn't the same plate
   (some real icons are solid squares). Icons with no alpha channel now treat pure black as transparent.
+
+## Round 6 – app page performance (1.2.1)
+- Feedback: the app page was choppy and dropped frames when opening and paging.
+- Cause: it was a full-screen `AllowsTransparency=true` window. WPF draws those as per-pixel-alpha
+  layered windows, copying the whole 3440×1440 frame back to system memory on every frame. On top of
+  that, every icon *and* every label had its own `DropShadowEffect` (~90 shaders per page, plus the
+  off-screen pages).
+- Fix:
+  - Normal (non-layered) window. Transparency comes from DWM: the frame is extended over the whole
+    client area (`DwmExtendFrameIntoClientArea(-1)`) with a transparent `CompositionTarget`, and
+    acrylic stays on top.
+  - `Window.Opacity` doesn't work without layering, so open/close fade the content root instead.
+    `WS_EX_LAYERED` + `SetLayeredWindowAttributes` was tried and rejected: WPF's hardware output never
+    shows up in such a window, so the page was invisible.
+  - Each page is a `BitmapCache` (at device DPI), so sliding and zooming move textures.
+  - Removed the label shadows; the dark tint already makes the labels readable.
+- Measured with `MACBAR_DEBUG=1` (the log records frames per slide). After the fix, page slides run
+  at ~70 fps, with at most one skipped frame.
