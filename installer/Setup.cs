@@ -1,4 +1,4 @@
-﻿// MacBar installer / uninstaller. MacBar.exe is embedded as a resource at build time.
+// MacBar installer / uninstaller. MacBar.exe is embedded as a resource at build time.
 // Installs per-user to %LOCALAPPDATA%\Programs\MacBar (no admin rights needed).
 using System;
 using System.Diagnostics;
@@ -12,13 +12,13 @@ using Microsoft.Win32;
 
 [assembly: AssemblyTitle("MacBar Setup")]
 [assembly: AssemblyProduct("MacBar")]
-[assembly: AssemblyVersion("1.3.0.0")]
-[assembly: AssemblyFileVersion("1.3.0.0")]
+[assembly: AssemblyVersion("1.3.1.0")]
+[assembly: AssemblyFileVersion("1.3.1.0")]
 
 static class Setup
 {
     const string AppName = "MacBar";
-    const string Version = "1.3.0";
+    const string Version = "1.3.1";
     const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\MacBar";
     static readonly string InstallDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Programs\MacBar");

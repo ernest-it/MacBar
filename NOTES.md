@@ -319,3 +319,10 @@ caption, so they don't trigger it.
   - A gradient wallpaper window over the real desktop.
   - Settings are never saved in demo mode.
   - Shots are in `docs/screenshots/`; the ultrawide ones are cropped and scaled to 1600 px.
+
+
+## Round 9: Shut Down, Restart and Log Out
+- `ShellUtil.Open` treats its whole argument as a file name, so `shutdown.exe /s /t 0` failed with
+  "The system cannot find the file specified" after the confirmation dialog. The bug affected all three items.
+- New `ShellUtil.Power(args)` passes the arguments separately, with no console window. It does nothing in
+  demo mode.

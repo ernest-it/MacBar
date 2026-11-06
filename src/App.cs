@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -9,8 +9,8 @@ using Microsoft.Win32;
 [assembly: System.Reflection.AssemblyTitle("MacBar")]
 [assembly: System.Reflection.AssemblyProduct("MacBar")]
 [assembly: System.Reflection.AssemblyDescription("macOS-style menu bar and dock for Windows")]
-[assembly: System.Reflection.AssemblyVersion("1.3.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.3.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.3.1.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.3.1.0")]
 
 namespace MacBar
 {

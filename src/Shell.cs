@@ -150,6 +150,14 @@ namespace MacBar
             catch (Exception ex) { MessageBox.Show("Couldn't open " + target + "\n\n" + ex.Message, "MacBar"); }
         }
 
+        /// <summary>Runs Windows' shutdown.exe with the given arguments (/s, /r or /l), without a console window.</summary>
+        public static void Power(string args)
+        {
+            if (Demo.On) return;
+            try { Process.Start(new ProcessStartInfo("shutdown.exe", args) { UseShellExecute = false, CreateNoWindow = true }); }
+            catch (Exception ex) { MessageBox.Show("Windows couldn't do that.\n\n" + ex.Message, "MacBar"); }
+        }
+
         [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern uint ExtractIconEx(string file, int index, IntPtr[] large, IntPtr[] small, uint n);
 
         static Dictionary<string, string> shortcutByTarget, shortcutByDir;
