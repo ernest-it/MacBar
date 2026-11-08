@@ -320,11 +320,11 @@ namespace MacBar
             m.Items.Add(MenuItem("MacBar Settings…", delegate { App.Instance.ShowSettings(); }));
             m.Items.Add(new Separator());
             m.Items.Add(MenuItem("Sleep", delegate { Native.SetSuspendState(false, false, false); }));
-            m.Items.Add(MenuItem("Restart…", delegate { if (Confirm("restart")) ShellUtil.Power("/r /t 0"); }));
-            m.Items.Add(MenuItem("Shut Down…", delegate { if (Confirm("shut down")) ShellUtil.Power("/s /t 0"); }));
+            m.Items.Add(MenuItem("Restart…", delegate { if (Confirm("restart")) ShellUtil.Power(ShellUtil.PowerAction.Restart); }));
+            m.Items.Add(MenuItem("Shut Down…", delegate { if (Confirm("shut down")) ShellUtil.Power(ShellUtil.PowerAction.ShutDown); }));
             m.Items.Add(new Separator());
             m.Items.Add(MenuItem("Lock Screen", delegate { Native.LockWorkStation(); }));
-            m.Items.Add(MenuItem("Log Out " + Environment.UserName + "…", delegate { if (Confirm("log out")) ShellUtil.Power("/l"); }));
+            m.Items.Add(MenuItem("Log Out " + Environment.UserName + "…", delegate { if (Confirm("log out")) ShellUtil.Power(ShellUtil.PowerAction.LogOut); }));
             m.Items.Add(new Separator());
             m.Items.Add(MenuItem("Quit MacBar", delegate { App.Instance.Quit(); }));
             m.IsOpen = true;

@@ -150,12 +150,64 @@ namespace MacBar
             catch (Exception ex) { MessageBox.Show("Couldn't open " + target + "\n\n" + ex.Message, "MacBar"); }
         }
 
-        /// <summary>Runs Windows' shutdown.exe with the given arguments (/s, /r or /l), without a console window.</summary>
-        public static void Power(string args)
+        public enum PowerAction { ShutDown, Restart, LogOut }
+
+        [DllImport("user32.dll", SetLastError = true)] static extern bool ExitWindowsEx(uint flags, uint reason);
+        [DllImport("advapi32.dll", SetLastError = true)] static extern bool OpenProcessToken(IntPtr process, uint access, out IntPtr token);
+        [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)] static extern bool LookupPrivilegeValue(string system, string name, out long luid);
+        [DllImport("advapi32.dll", SetLastError = true)] static extern bool AdjustTokenPrivileges(IntPtr token, bool disableAll, ref TokenPrivilege state, int len, IntPtr prev, IntPtr retLen);
+        [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+        [StructLayout(LayoutKind.Sequential, Pack = 4)] struct TokenPrivilege { public int Count; public long Luid; public int Attributes; }
+
+        /// <summary>Turns on SeShutdownPrivilege for this process (users have it, but it starts disabled).</summary>
+        static bool EnableShutdownPrivilege()
+        {
+            IntPtr token;
+            if (!OpenProcessToken(Process.GetCurrentProcess().Handle, 0x20 | 0x8 /* ADJUST_PRIVILEGES | QUERY */, out token)) return false;
+            try
+            {
+                var tp = new TokenPrivilege { Count = 1, Attributes = 2 /* SE_PRIVILEGE_ENABLED */ };
+                if (!LookupPrivilegeValue(null, "SeShutdownPrivilege", out tp.Luid)) return false;
+                AdjustTokenPrivileges(token, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+                return Marshal.GetLastWin32Error() == 0; // ERROR_NOT_ALL_ASSIGNED (1300) means the account lacks it
+            }
+            finally { CloseHandle(token); }
+        }
+
+        /// <summary>
+        /// Shuts down, restarts or signs out the way the Start menu does: ask Windows directly. If that is
+        /// refused, falls back to shutdown.exe, and if that fails too, says why instead of doing nothing.
+        /// </summary>
+        public static void Power(PowerAction action)
         {
             if (Demo.On) return;
-            try { Process.Start(new ProcessStartInfo("shutdown.exe", args) { UseShellExecute = false, CreateNoWindow = true }); }
-            catch (Exception ex) { MessageBox.Show("Windows couldn't do that.\n\n" + ex.Message, "MacBar"); }
+            const uint EWX_LOGOFF = 0, EWX_SHUTDOWN = 1, EWX_REBOOT = 2, EWX_POWEROFF = 8;
+            const uint REASON = 0x80000000; // SHTDN_REASON_FLAG_PLANNED, "other"
+            uint flags = action == PowerAction.ShutDown ? EWX_SHUTDOWN | EWX_POWEROFF : action == PowerAction.Restart ? EWX_REBOOT : EWX_LOGOFF;
+            string args = action == PowerAction.ShutDown ? "/s /t 0" : action == PowerAction.Restart ? "/r /t 0" : "/l";
+
+            bool priv = action == PowerAction.LogOut || EnableShutdownPrivilege();
+            if (ExitWindowsEx(flags, REASON)) { App.Trace("power: " + action + " started (privilege " + priv + ")"); return; }
+            int err = Marshal.GetLastWin32Error();
+            App.Trace("power: ExitWindowsEx(" + action + ") failed, error " + err + ", privilege " + priv + "; trying shutdown.exe " + args);
+
+            string detail;
+            try
+            {
+                var psi = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "shutdown.exe"), args)
+                { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true };
+                using (var p = Process.Start(psi))
+                {
+                    string output = (p.StandardError.ReadToEnd() + " " + p.StandardOutput.ReadToEnd()).Trim();
+                    if (!p.WaitForExit(10000) || p.ExitCode == 0) return; // accepted (or still working on it)
+                    detail = "shutdown.exe exit code " + p.ExitCode + (output.Length > 0 ? ": " + output : "");
+                }
+            }
+            catch (Exception ex) { detail = ex.Message; }
+            App.Trace("power: shutdown.exe failed: " + detail);
+            MessageBox.Show("Windows refused to " + (action == PowerAction.ShutDown ? "shut down" : action == PowerAction.Restart ? "restart" : "sign out") +
+                            ".\n\n" + new System.ComponentModel.Win32Exception(err).Message + " (" + err + ")\n" + detail, "MacBar",
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern uint ExtractIconEx(string file, int index, IntPtr[] large, IntPtr[] small, uint n);

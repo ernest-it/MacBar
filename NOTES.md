@@ -326,3 +326,8 @@ caption, so they don't trigger it.
   "The system cannot find the file specified" after the confirmation dialog. The bug affected all three items.
 - New `ShellUtil.Power(args)` passes the arguments separately, with no console window. It does nothing in
   demo mode.
+- **1.3.1 still didn't shut down:** clicking OK did nothing, and Windows logged no shutdown request.
+  `ShellUtil.Power` now works like the Start menu: it turns on `SeShutdownPrivilege` (users have it,
+  but it starts disabled) and calls `ExitWindowsEx`. If that fails, it falls back to `shutdown.exe` and
+  shows the Windows error instead of failing silently. Confirmed on the real PC: event 1074 says
+  "MacBar.exe has initiated the power off". Released as 1.3.2.
