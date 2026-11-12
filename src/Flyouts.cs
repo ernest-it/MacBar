@@ -159,50 +159,89 @@ namespace MacBar
             slider.ValueChanged += delegate (double v) { audio.SetVolume((float)v); refresh(); onChange(); };
             row.Children.Add(muteHost); row.Children.Add(pct); row.Children.Add(slider);
             Body.Children.Add(row);
-            // Output switcher (macOS-style list; the selected device gets a blue badge).
+            // Output and input switchers (macOS-style lists; the selected device gets a blue badge).
             var outputs = new StackPanel();
-            Action buildOutputs = null;
+            var inputs = new StackPanel();
+            Action buildOutputs = null, buildInputs = null;
             buildOutputs = delegate
             {
-                outputs.Children.Clear();
-                var list = audio.Outputs();
-                if (list.Count == 0) return;
-                var head = Text("Output", 11, FontWeights.SemiBold, 0.55);
-                head.Margin = new Thickness(0, 4, 0, 2);
-                outputs.Children.Add(head);
-                foreach (var o in list)
+                DeviceList(outputs, "Output", audio.Outputs(), null, sel => Glyphs.Speaker(2, false, sel ? Brushes.White : null, 14), dev =>
                 {
-                    var dev = o;
-                    var r = new DockPanel();
-                    var badge = new Border
+                    audio.SetDefault(dev.Id);
+                    slider.Value = audio.Volume;
+                    refresh(); onChange(); buildOutputs();
+                });
+            };
+            buildInputs = delegate
+            {
+                bool? micMuted = audio.MicMuted();
+                FrameworkElement muteSwitch = null;
+                if (micMuted.HasValue)
+                {
+                    var sw = new ToggleSwitch(!micMuted.Value);
+                    sw.Toggled += on =>
                     {
-                        Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Margin = new Thickness(0, 0, 10, 0),
-                        Background = dev.IsDefault ? new SolidColorBrush(Theme.Accent) : Theme.FgAlpha(0x22),
-                        Child = Glyphs.Speaker(2, false, dev.IsDefault ? Brushes.White : null, 14)
+                        audio.SetMicMute(!on); onChange();
+                        // Let the switch finish its slide before the list redraws.
+                        var t = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
+                        t.Tick += delegate { t.Stop(); buildInputs(); };
+                        t.Start();
                     };
-                    r.Children.Add(badge);
-                    var name = Text(dev.Name, 13, dev.IsDefault ? FontWeights.SemiBold : FontWeights.Normal, 1);
-                    name.VerticalAlignment = VerticalAlignment.Center;
-                    r.Children.Add(name);
-                    var host = new Border { Child = r, CornerRadius = new CornerRadius(6), Padding = new Thickness(6, 3, 6, 3), Margin = new Thickness(-6, 1, -6, 1), Background = Brushes.Transparent, Cursor = Cursors.Hand };
-                    host.MouseEnter += delegate { host.Background = Theme.Hover; };
-                    host.MouseLeave += delegate { host.Background = Brushes.Transparent; };
-                    host.MouseLeftButtonUp += delegate
-                    {
-                        if (dev.IsDefault) return;
-                        audio.SetDefault(dev.Id);
-                        slider.Value = audio.Volume;
-                        refresh(); onChange(); buildOutputs();
-                    };
-                    outputs.Children.Add(host);
+                    ToolTipService.SetToolTip(sw, micMuted.Value ? "Microphone muted - click to unmute" : "Microphone on - click to mute");
+                    muteSwitch = sw;
                 }
+                DeviceList(inputs, micMuted == true ? "Input · Muted" : "Input", audio.Inputs(), muteSwitch,
+                    sel => Glyphs.Mic(sel && micMuted == true, sel ? Brushes.White : null, 14), dev =>
+                {
+                    audio.SetDefault(dev.Id);
+                    onChange(); buildInputs();
+                });
             };
             buildOutputs();
+            buildInputs();
             Body.Children.Add(Separator());
             Body.Children.Add(outputs);
             Body.Children.Add(Separator());
+            Body.Children.Add(inputs);
+            Body.Children.Add(Separator());
             Body.Children.Add(Link("Sound Settings…", delegate { ShellUtil.Open("ms-settings:sound"); }));
             Body.Children.Add(Link("Volume Mixer…", delegate { ShellUtil.Open("ms-settings:apps-volume"); }));
+        }
+
+        /// <summary>A titled device list (header with an optional control on the right, one row per device).</summary>
+        void DeviceList(StackPanel into, string title, System.Collections.Generic.List<AudioOutput> list, FrameworkElement headerRight,
+            Func<bool, FrameworkElement> icon, Action<AudioOutput> pick)
+        {
+            into.Children.Clear();
+            if (list.Count == 0) return;
+            var headRow = new DockPanel { Margin = new Thickness(0, 4, 0, 2) };
+            if (headerRight != null) { DockPanel.SetDock(headerRight, Dock.Right); headRow.Children.Add(headerRight); }
+            var head = Text(title, 11, FontWeights.SemiBold, 0.55);
+            head.VerticalAlignment = VerticalAlignment.Center;
+            headRow.Children.Add(head);
+            into.Children.Add(headRow);
+            foreach (var o in list)
+            {
+                var dev = o;
+                var r = new DockPanel();
+                var glyph = icon(dev.IsDefault);
+                var badge = new Border
+                {
+                    Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Margin = new Thickness(0, 0, 10, 0),
+                    Background = dev.IsDefault ? new SolidColorBrush(Theme.Accent) : Theme.FgAlpha(0x22),
+                    Child = glyph
+                };
+                r.Children.Add(badge);
+                var name = Text(dev.Name, 13, dev.IsDefault ? FontWeights.SemiBold : FontWeights.Normal, 1);
+                name.VerticalAlignment = VerticalAlignment.Center;
+                name.TextTrimming = TextTrimming.CharacterEllipsis;
+                r.Children.Add(name);
+                var host = new Border { Child = r, CornerRadius = new CornerRadius(6), Padding = new Thickness(6, 3, 6, 3), Margin = new Thickness(-6, 1, -6, 1), Background = Brushes.Transparent, Cursor = Cursors.Hand };
+                host.MouseEnter += delegate { host.Background = Theme.Hover; };
+                host.MouseLeave += delegate { host.Background = Brushes.Transparent; };
+                host.MouseLeftButtonUp += delegate { if (!dev.IsDefault) pick(dev); };
+                into.Children.Add(host);
+            }
         }
     }
 

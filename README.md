@@ -32,6 +32,16 @@ while it runs and puts it back when you quit.
 - Click: launch / focus / minimize / cycle windows. Right-click: window list, Keep in Dock,
   Remove from Dock, New Window, Show in File Explorer, Quit
 
+**Workspaces** (system menu → Workspaces)
+- Save where every window goes across your monitors, then put it all back in one click
+- Reuses windows that are already open instead of starting second copies; only opens what's missing
+  (or choose "Arrange Open Windows Only" to open nothing)
+- Knows Chrome profiles: each Chrome window is matched to its own profile and missing ones open in that profile
+- Aligns windows by their visible edges (no gaps from invisible borders) and re-checks for a few seconds
+  so apps that restore their own position still end up in place
+- Optional: run a workspace at sign-in, opening missing apps or only arranging windows as they appear
+- Imports PowerToys Workspaces
+
 **Menu bar (top)**
 - Left: system menu (About, Settings, Task Manager, Sleep, Restart, Shut Down, Lock, Log Out)
   and the active app's name in bold
@@ -40,7 +50,7 @@ while it runs and puts it back when you quit.
 - Windows' own sound, Wi‑Fi, battery, microphone and Bluetooth tray icons are left out (the menu bar and
   Control Center already cover them); hide any other tray icon under Settings → Menu bar
 - **Wi‑Fi** panel: on/off switch, current network, known and other networks, connect/disconnect
-- **Sound** panel: volume slider, mute, output device switcher; scroll over the icon to change volume
+- **Sound** panel: volume slider, mute, output device switcher, microphone switcher with a mic on/off switch; scroll over the icon to change volume
 - **Control Center** (sliders icon next to the clock): Wi‑Fi, Bluetooth and Airplane Mode toggles,
   Do Not Disturb and Screen Mirroring tiles, display brightness (laptops and DDC/CI monitors),
   volume, and Now Playing
@@ -48,6 +58,8 @@ while it runs and puts it back when you quit.
   music plays; hover for controls, click for a big player with blurred album-art background and a
   seekable progress bar (works with Spotify, browsers and any app using Windows media controls)
 - **Calendar** panel: today's date, month calendar, shortcuts to notifications and Do Not Disturb
+- **Lighting** (palette icon): your [OpenRGB](https://openrgb.org) profiles, one click to switch. Shown
+  only while OpenRGB runs with its SDK server on (OpenRGB → SDK Server → Start Server)
 - **Weather**: current conditions + 6-day forecast from [Open-Meteo](https://open-meteo.com) (no API key,
   no Windows location access; pick your city in Settings; °F or °C; refreshes every 30 min; works offline
   with the last known data)
@@ -57,7 +69,9 @@ while it runs and puts it back when you quit.
   None / Light / Strong (fully transparent is possible)
 - Subtle shadow behind icons and text so they're readable on light or dark wallpapers
 - Automatic light/dark theme (or force one)
-- Hide automatically when an app goes full screen (videos, games, F11)
+- Hide automatically when an app goes full screen (videos, games, F11). While hidden, hold the mouse at the
+  top edge to bring the menu bar down (it hides again when you leave it), and the Windows key brings up the
+  dock with the app page
 - Windows use the full screen height; the menu bar reserves its strip by default so desktop icons and
   title bars aren't covered (both are configurable)
 

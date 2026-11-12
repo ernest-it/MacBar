@@ -33,6 +33,8 @@ namespace MacBar
         public List<PinnedApp> Pinned { get; set; }
         public bool PinsImported { get; set; }
         public List<string> HiddenTrayIcons { get; set; } // TrayIcon.Key values the user chose to hide
+        public bool ShowLighting { get; set; }      // OpenRGB profiles menu (shown only while OpenRGB's SDK server runs)
+        public string OpenRgbProfile { get; set; }  // last profile loaded from MacBar
         // Remembers the taskbar's auto-hide state so it can be restored even after a crash.
         public bool TaskbarHidden { get; set; }
         public int SavedTaskbarState { get; set; }
@@ -41,7 +43,7 @@ namespace MacBar
         {
             Theme = "Auto"; Opacity = 20; Blur = 1; IconSize = 44; DockAutoHide = 1;
             MenuBarReservesSpace = true; DockReservesSpace = false;
-            ShowTrayIcons = true; ShowBatteryPercent = true;
+            ShowTrayIcons = true; ShowBatteryPercent = true; ShowLighting = true; OpenRgbProfile = "";
             Fahrenheit = true; WeatherLocation = ""; Pinned = new List<PinnedApp>(); HiddenTrayIcons = new List<string>();
         }
 

@@ -37,6 +37,12 @@ namespace MacBar
             };
         }
 
+        /// <summary>Puts the bar back on top of other topmost windows (the app page, a full-screen game).</summary>
+        public void BringToFront()
+        {
+            if (Hwnd != IntPtr.Zero) Native.SetWindowPos(Hwnd, Native.HWND_TOPMOST, 0, 0, 0, 0, Native.SWP_NOSIZE | Native.SWP_NOACTIVATE | 0x0002 /* NOMOVE */);
+        }
+
         public double Scale
         {
             get { var src = PresentationSource.FromVisual(this); return src != null ? src.CompositionTarget.TransformToDevice.M11 : 1; }
@@ -105,7 +111,7 @@ namespace MacBar
         readonly StackPanel left = new StackPanel { Orientation = Orientation.Horizontal };
         readonly StackPanel right = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         readonly StackPanel trayPanel = new StackPanel { Orientation = Orientation.Horizontal };
-        Border logoItem, weatherItem, wifiItem, soundItem, batteryItem, dateItem, timeItem;
+        Border logoItem, lightingItem, weatherItem, wifiItem, soundItem, batteryItem, dateItem, timeItem;
         TextBlock appName, weatherGlyph, weatherTemp, batteryText, dateText, timeText;
         string datePattern = "ddd MMM d", timePattern = "h:mm tt";
         WinEventProc fgProc; IntPtr fgHook;
@@ -142,6 +148,13 @@ namespace MacBar
             var status = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             status.Tick += delegate { PollStatus(false); };
             status.Start();
+
+            // OpenRGB: look for its SDK server now and every 15 s (a quick local connection).
+            OpenRgb.Changed += UpdateLighting;
+            OpenRgb.Refresh(Dispatcher);
+            var rgb = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+            rgb.Tick += delegate { if (S.ShowLighting) OpenRgb.Refresh(Dispatcher); };
+            rgb.Start();
 
             if (tray != null) tray.Changed += RebuildTray;
             weather.Updated += UpdateWeather;
@@ -191,6 +204,16 @@ namespace MacBar
 
             right.Children.Add(trayPanel);
             RebuildTray();
+
+            lightingItem = Item(Glyphs.Lighting());
+            lightingItem.MouseLeftButtonUp += delegate
+            {
+                if (Flyout.ToggleOff("lighting")) return;
+                new LightingFlyout(S, UpdateLighting).ShowBelow(lightingItem);
+                OpenRgb.Refresh(Dispatcher); // pick up profiles saved since the last check
+            };
+            right.Children.Add(lightingItem);
+            UpdateLighting();
 
             var wp = new StackPanel { Orientation = Orientation.Horizontal };
             weatherGlyph = new TextBlock { FontFamily = new FontFamily("Segoe UI Symbol, Segoe UI Emoji"), FontSize = 14, Foreground = Theme.Fg, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) };
@@ -318,6 +341,7 @@ namespace MacBar
             m.Items.Add(MenuItem("System Settings…", delegate { ShellUtil.Open("ms-settings:"); }));
             m.Items.Add(MenuItem("Task Manager", delegate { ShellUtil.Open("taskmgr.exe"); }));
             m.Items.Add(MenuItem("MacBar Settings…", delegate { App.Instance.ShowSettings(); }));
+            m.Items.Add(WorkspacesMenu());
             m.Items.Add(new Separator());
             m.Items.Add(MenuItem("Sleep", delegate { Native.SetSuspendState(false, false, false); }));
             m.Items.Add(MenuItem("Restart…", delegate { if (Confirm("restart")) ShellUtil.Power(ShellUtil.PowerAction.Restart); }));
@@ -328,6 +352,23 @@ namespace MacBar
             m.Items.Add(new Separator());
             m.Items.Add(MenuItem("Quit MacBar", delegate { App.Instance.Quit(); }));
             m.IsOpen = true;
+        }
+
+        /// <summary>System menu → Workspaces: each workspace (open & arrange, or arrange only), plus the editor.</summary>
+        static MenuItem WorkspacesMenu()
+        {
+            var root = new MenuItem { Header = "Workspaces" };
+            foreach (var w in Workspaces.All)
+            {
+                var ws = w;
+                var item = new MenuItem { Header = ws.Name.Replace("_", "__") };
+                item.Items.Add(MenuItem("Open Missing Apps & Arrange", delegate { Workspaces.Run(ws, true, 20, App.Instance.Dispatcher, Workspaces.ShowResult); }));
+                item.Items.Add(MenuItem("Arrange Open Windows Only", delegate { Workspaces.Run(ws, false, 4, App.Instance.Dispatcher, Workspaces.ShowResult); }));
+                root.Items.Add(item);
+            }
+            if (Workspaces.All.Count > 0) root.Items.Add(new Separator());
+            root.Items.Add(MenuItem("Edit Workspaces…", delegate { App.Instance.ShowWorkspaces(); }));
+            return root;
         }
 
         static bool Confirm(string action)
@@ -387,6 +428,13 @@ namespace MacBar
             weatherGlyph.Text = WeatherService.Glyph(d.Code, d.IsDay);
             weatherTemp.Text = weather.Temp(d.TempC);
             weatherItem.ToolTip = WeatherService.Describe(d.Code) + (string.IsNullOrEmpty(d.Location) ? "" : " · " + d.Location) + (weather.LastFetchFailed ? " (offline)" : "");
+        }
+
+        void UpdateLighting()
+        {
+            if (lightingItem == null) return;
+            lightingItem.Visibility = S.ShowLighting && OpenRgb.Available ? Visibility.Visible : Visibility.Collapsed;
+            lightingItem.ToolTip = string.IsNullOrEmpty(S.OpenRgbProfile) ? "Lighting (OpenRGB)" : "Lighting: " + S.OpenRgbProfile;
         }
 
         public void PollStatus(bool force)

@@ -92,6 +92,7 @@ namespace MacBar
             Check("Keep windows and desktop icons below the menu bar", s.MenuBarReservesSpace, v => s.MenuBarReservesSpace = v);
             Check("Show tray (background app) icons", s.ShowTrayIcons, v => s.ShowTrayIcons = v);
             Check("Show battery percentage", s.ShowBatteryPercent, v => s.ShowBatteryPercent = v);
+            Check("Show OpenRGB lighting profiles (needs OpenRGB's SDK server)", s.ShowLighting, v => { s.ShowLighting = v; if (v) OpenRgb.Refresh(Dispatcher); });
 
             // One checkbox per background-app icon currently in the menu bar (e.g. hide Windows Security).
             var icons = App.Instance.Tray.Icons.Where(i => !i.Hidden && i.Icon != null && !TopBar.Redundant(i))

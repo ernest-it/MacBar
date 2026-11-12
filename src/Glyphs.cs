@@ -50,6 +50,8 @@ namespace MacBar
 
         public static FrameworkElement Ethernet() { return G("", Theme.Fg, Size); }
 
+        public static FrameworkElement Mic(bool muted, Brush color = null, double size = Size) { return G(muted ? "" : "", color ?? Theme.Fg, size); }
+
         public static FrameworkElement Speaker(int waves, bool muted, Brush color = null, double size = Size)
         {
             Brush on = color ?? Theme.Fg;
@@ -68,6 +70,9 @@ namespace MacBar
         }
 
         public static FrameworkElement ControlCenter() { return G("", Theme.Fg, Size); }
+
+        /// <summary>Paint palette, for the OpenRGB lighting menu.</summary>
+        public static FrameworkElement Lighting() { return G("", Theme.Fg, Size); }
 
         public static FrameworkElement Logo()
         {

@@ -9,8 +9,8 @@ using Microsoft.Win32;
 [assembly: System.Reflection.AssemblyTitle("MacBar")]
 [assembly: System.Reflection.AssemblyProduct("MacBar")]
 [assembly: System.Reflection.AssemblyDescription("macOS-style menu bar and dock for Windows")]
-[assembly: System.Reflection.AssemblyVersion("1.3.2.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.3.2.0")]
+[assembly: System.Reflection.AssemblyVersion("1.4.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.4.0.0")]
 
 namespace MacBar
 {
@@ -80,6 +80,8 @@ namespace MacBar
             dock = new DockWindow(S);
             dock.Show();
             Weather.Refresh();
+            Workspaces.Load();
+            Workspaces.RunAtSignIn(Dispatcher);
             // A lone Windows key press opens the app page instead of the Windows Start menu.
             WinKey.Start(Dispatcher, delegate { if (!cleanedUp) ToggleAppsPage(); });
 
@@ -152,6 +154,32 @@ namespace MacBar
             IntPtr r;
             foreach (var desk in new[] { Native.GetShellWindow(), Native.FindWindowEx(IntPtr.Zero, IntPtr.Zero, "Progman", null) })
                 if (desk != IntPtr.Zero) Native.SendMessageTimeout(desk, 0x001A /* WM_SETTINGCHANGE */, new IntPtr(SPI_SETWORKAREA), IntPtr.Zero, 2, 500, out r);
+            NotifyWorkAreaChanged();
+        }
+
+        /// <summary>
+        /// Tells every other app (except Explorer, see above) that the work area changed. Window managers like
+        /// PowerToys FancyZones size their zones from the work area and otherwise keep the full-screen one they
+        /// read before the menu bar reserved its strip, so snapped windows end up under the menu bar.
+        /// </summary>
+        void NotifyWorkAreaChanged()
+        {
+            var skip = new System.Collections.Generic.HashSet<uint> { myPid };
+            IntPtr shell = Native.GetShellWindow();
+            if (shell != IntPtr.Zero) skip.Add(Native.GetPid(shell));
+            IntPtr realTray = Native.FindRealTray(tray != null ? tray.Hwnd : IntPtr.Zero);
+            if (realTray != IntPtr.Zero) skip.Add(Native.GetPid(realTray));
+            var targets = new System.Collections.Generic.List<IntPtr>();
+            Native.EnumWindows((h, l) => { if (!skip.Contains(Native.GetPid(h))) targets.Add(h); return true; }, IntPtr.Zero);
+            // WM_SETTINGCHANGE can't be posted; send it off the UI thread so a slow app can't stall the bars.
+            var t = new System.Threading.Thread(() =>
+            {
+                IntPtr r;
+                foreach (var h in targets)
+                    Native.SendMessageTimeout(h, 0x001A, new IntPtr(SPI_SETWORKAREA), IntPtr.Zero, 2 /* ABORTIFHUNG */, 200, out r);
+            });
+            t.IsBackground = true;
+            t.Start();
         }
 
         bool fullscreenNow;
@@ -193,9 +221,78 @@ namespace MacBar
 
         public void OnFullscreen(bool fullscreen)
         {
-            var v = fullscreen ? Visibility.Hidden : Visibility.Visible;
-            if (top != null) top.Visibility = v;
-            if (dock != null) dock.Visibility = v;
+            peekTop = false; edgeSince = DateTime.MinValue;
+            if (fullscreen)
+            {
+                if (peekTimer == null)
+                {
+                    peekTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(60) };
+                    peekTimer.Tick += delegate { PeekTick(); };
+                }
+                peekTimer.Start();
+            }
+            else if (peekTimer != null) peekTimer.Stop();
+            UpdateBarVisibility();
+        }
+
+        // While a full-screen app (game, video) hides the bars: the app page brings both back, and parking the
+        // mouse at the top edge slides the menu bar down until the mouse leaves it again.
+        DispatcherTimer peekTimer;
+        bool peekTop;
+        DateTime edgeSince = DateTime.MinValue, awaySince = DateTime.MinValue;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool GetClipCursor(out RECT r);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr WindowFromPoint(POINT p);
+
+        void UpdateBarVisibility()
+        {
+            bool appsOpen = launchpad != null && launchpad.IsVisible;
+            bool showTop = !fullscreenNow || appsOpen || peekTop;
+            bool showDock = !fullscreenNow || appsOpen;
+            if (top != null)
+            {
+                var v = showTop ? Visibility.Visible : Visibility.Hidden;
+                if (top.Visibility != v) { top.Visibility = v; if (showTop && fullscreenNow) top.BringToFront(); }
+            }
+            if (dock != null)
+            {
+                var v = showDock ? Visibility.Visible : Visibility.Hidden;
+                if (dock.Visibility != v) { dock.Visibility = v; if (showDock && fullscreenNow) dock.BringToFront(); }
+            }
+        }
+
+        void PeekTick()
+        {
+            if (!fullscreenNow || top == null) return;
+            POINT p; Native.GetCursorPos(out p);
+            int sw = Native.GetSystemMetrics(0);
+            DateTime now = DateTime.Now;
+            if (!peekTop)
+            {
+                // Games that keep the cursor locked to their window (while playing) clip it; only peek once it's free.
+                RECT clip; bool clipped = GetClipCursor(out clip) &&
+                    (clip.Left > Native.GetSystemMetrics(76) || clip.Top > Native.GetSystemMetrics(77) ||
+                     clip.Right < Native.GetSystemMetrics(76) + Native.GetSystemMetrics(78) || clip.Bottom < Native.GetSystemMetrics(77) + Native.GetSystemMetrics(79));
+                bool atEdge = !clipped && p.Y <= 1 && p.Y >= -2 && p.X >= 0 && p.X < sw;
+                if (!atEdge) { edgeSince = DateTime.MinValue; return; }
+                if (edgeSince == DateTime.MinValue) edgeSince = now;
+                // A short hold, so flicking past the edge mid-game doesn't drop the bar.
+                if ((now - edgeSince).TotalMilliseconds < 250) return;
+                peekTop = true; awaySince = DateTime.MinValue;
+                UpdateBarVisibility();
+                return;
+            }
+            // Keep it while the mouse is on the bar or on anything of ours (open menus, panels), or a panel has focus.
+            int barPx = (int)Math.Round(top.ActualHeight * top.Scale) + 6;
+            IntPtr under = WindowFromPoint(p);
+            bool keep = (p.Y < barPx && p.X >= 0 && p.X < sw) ||
+                        (under != IntPtr.Zero && Native.GetPid(under) == myPid) ||
+                        Native.GetPid(Native.GetForegroundWindow()) == myPid;
+            if (keep) { awaySince = DateTime.MinValue; return; }
+            if (awaySince == DateTime.MinValue) awaySince = now;
+            if ((now - awaySince).TotalMilliseconds < 500) return;
+            peekTop = false; edgeSince = DateTime.MinValue;
+            UpdateBarVisibility();
         }
 
         public Window MainBar { get { return top; } }
@@ -211,7 +308,9 @@ namespace MacBar
                 launchpad.IsVisibleChanged += delegate
                 {
                     dock.HoldShown = launchpad.IsVisible;
-                    if (launchpad.IsVisible) dock.BringToFront();
+                    // Over a full-screen game the bars are hidden; bring them back with the app page.
+                    UpdateBarVisibility();
+                    if (launchpad.IsVisible) { top.BringToFront(); dock.BringToFront(); }
                 };
                 launchpad.Activated += delegate { dock.BringToFront(); };
             }
@@ -235,6 +334,19 @@ namespace MacBar
                 settingsWindow.Show();
             }
             settingsWindow.Activate();
+        }
+
+        WorkspacesWindow workspacesWindow;
+
+        public void ShowWorkspaces()
+        {
+            if (workspacesWindow == null)
+            {
+                workspacesWindow = new WorkspacesWindow();
+                workspacesWindow.Closed += delegate { workspacesWindow = null; };
+                workspacesWindow.Show();
+            }
+            workspacesWindow.Activate();
         }
 
         public void Quit()

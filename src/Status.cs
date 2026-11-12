@@ -66,14 +66,28 @@ namespace MacBar
     public class AudioController
     {
         /// <summary>Active playback devices.</summary>
-        public System.Collections.Generic.List<AudioOutput> Outputs()
+        public System.Collections.Generic.List<AudioOutput> Outputs() { return Devices(0); }
+
+        /// <summary>Active recording devices (microphones).</summary>
+        public System.Collections.Generic.List<AudioOutput> Inputs() { return Devices(1); }
+
+        string DefaultId(int flow)
+        {
+            IMMDevice d; string id = null;
+            // Windows' sound settings show the console-role default for recording, multimedia for playback.
+            if (enumerator.GetDefaultAudioEndpoint(flow, flow == 1 ? 0 : 1, out d) == 0 && d != null) { d.GetId(out id); Marshal.ReleaseComObject(d); }
+            return id;
+        }
+
+        System.Collections.Generic.List<AudioOutput> Devices(int flow)
         {
             var result = new System.Collections.Generic.List<AudioOutput>();
             try
             {
                 if (enumerator == null) enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorCo();
+                string defId = DefaultId(flow);
                 IMMDeviceCollection col;
-                if (enumerator.EnumAudioEndpoints(0, 1 /* DEVICE_STATE_ACTIVE */, out col) != 0 || col == null) return result;
+                if (enumerator.EnumAudioEndpoints(flow, 1 /* DEVICE_STATE_ACTIVE */, out col) != 0 || col == null) return result;
                 uint n; col.GetCount(out n);
                 for (uint i = 0; i < n; i++)
                 {
@@ -83,7 +97,7 @@ namespace MacBar
                     string name = "";
                     IPropertyStore ps;
                     if (d.OpenPropertyStore(0, out ps) == 0 && ps != null) { name = Native.ReadString(ps, FriendlyName) ?? ""; Marshal.ReleaseComObject(ps); }
-                    result.Add(new AudioOutput { Id = id, Name = string.IsNullOrEmpty(name) ? "Unknown device" : name, IsDefault = id == deviceId });
+                    result.Add(new AudioOutput { Id = id, Name = string.IsNullOrEmpty(name) ? "Unknown device" : name, IsDefault = id == defId });
                     Marshal.ReleaseComObject(d);
                 }
                 Marshal.ReleaseComObject(col);
@@ -176,6 +190,40 @@ namespace MacBar
             if (endpoint == null) return;
             endpoint.SetMute(m, ref ctx);
             Poll();
+        }
+
+        IAudioEndpointVolume MicEndpoint()
+        {
+            try
+            {
+                if (enumerator == null) enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorCo();
+                IMMDevice dev;
+                if (enumerator.GetDefaultAudioEndpoint(1, 0, out dev) != 0 || dev == null) return null;
+                Guid iid = typeof(IAudioEndpointVolume).GUID; object o;
+                int hr = dev.Activate(ref iid, 23, IntPtr.Zero, out o);
+                Marshal.ReleaseComObject(dev);
+                return hr == 0 ? (IAudioEndpointVolume)o : null;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>Mute state of the default microphone; null when there's no microphone.</summary>
+        public bool? MicMuted()
+        {
+            var ep = MicEndpoint();
+            if (ep == null) return null;
+            try { bool m; ep.GetMute(out m); return m; }
+            catch { return null; }
+            finally { Marshal.ReleaseComObject(ep); }
+        }
+
+        public void SetMicMute(bool m)
+        {
+            var ep = MicEndpoint();
+            if (ep == null) return;
+            try { ep.SetMute(m, ref ctx); }
+            catch { }
+            finally { Marshal.ReleaseComObject(ep); }
         }
     }
 

@@ -142,12 +142,6 @@ namespace MacBar
         /// <summary>Keeps the dock up (e.g. while the app page is open from the Windows key).</summary>
         public bool HoldShown;
 
-        /// <summary>Puts the dock back on top of other topmost windows (the app page).</summary>
-        public void BringToFront()
-        {
-            if (Hwnd != IntPtr.Zero) Native.SetWindowPos(Hwnd, Native.HWND_TOPMOST, 0, 0, 0, 0, Native.SWP_NOSIZE | Native.SWP_NOACTIVATE | 0x0002 /* NOMOVE */);
-        }
-
         void Place()
         {
             double e = progress * progress * (3 - 2 * progress); // smoothstep

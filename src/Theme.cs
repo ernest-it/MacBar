@@ -110,9 +110,20 @@ namespace MacBar
   <Setter Property='Template'><Setter.Value>
    <ControlTemplate TargetType='MenuItem'>
     <Border x:Name='Bd' Background='Transparent' CornerRadius='4' Padding='10,4,20,4'>
-     <ContentPresenter ContentSource='Header' RecognizesAccessKey='False'/>
+     <Grid>
+      <ContentPresenter ContentSource='Header' RecognizesAccessKey='False'/>
+      <TextBlock x:Name='Arrow' Text='&#x203A;' FontSize='15' Margin='0,-2,-12,0' HorizontalAlignment='Right' VerticalAlignment='Center' Visibility='Collapsed'/>
+      <Popup x:Name='PART_Popup' Placement='Right' HorizontalOffset='22' VerticalOffset='-12' AllowsTransparency='True' Focusable='False' PopupAnimation='None'
+             IsOpen='{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}'>
+       <Border Background='{BG}' BorderBrush='{BORDER}' BorderThickness='1' CornerRadius='8' Padding='5' Margin='2,2,10,12' MinWidth='180'>
+        <Border.Effect><DropShadowEffect BlurRadius='14' ShadowDepth='4' Opacity='0.28'/></Border.Effect>
+        <StackPanel IsItemsHost='True' KeyboardNavigation.DirectionalNavigation='Cycle'/>
+       </Border>
+      </Popup>
+     </Grid>
     </Border>
     <ControlTemplate.Triggers>
+     <Trigger Property='HasItems' Value='True'><Setter TargetName='Arrow' Property='Visibility' Value='Visible'/></Trigger>
      <Trigger Property='IsHighlighted' Value='True'>
       <Setter TargetName='Bd' Property='Background' Value='#0A64D8'/>
       <Setter Property='Foreground' Value='White'/>

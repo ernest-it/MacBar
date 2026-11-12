@@ -331,3 +331,79 @@ caption, so they don't trigger it.
   but it starts disabled) and calls `ExitWindowsEx`. If that fails, it falls back to `shutdown.exe` and
   shows the Windows error instead of failing silently. Confirmed on the real PC: event 1074 says
   "MacBar.exe has initiated the power off". Released as 1.3.2.
+
+## Round 10: OpenRGB lighting menu
+- New palette icon left of the weather. It opens a "Lighting" panel listing OpenRGB's saved profiles;
+  click one to load it.
+- Uses OpenRGB's SDK server on `127.0.0.1:6742` (`src/OpenRgb.cs`). Each request opens a short
+  connection, sets the client name, negotiates protocol 4 (profiles need 2+), then sends packet 150
+  (profile list) or 152 (load profile, name with a trailing NUL like OpenRGB's own client).
+- Checks for the server at startup and every 15 s. The icon shows only while the server answers.
+  Settings → Menu bar has a checkbox to turn it off.
+- OpenRGB can't report the active profile, so the check mark is the last profile loaded from MacBar
+  (`OpenRgbProfile` in settings).
+- Dot colors come from the profile name ("Lavender", "Orange", "mint", ...). "off" shows a power
+  ring, and unknown names show a rainbow.
+
+## Round 11: Workspaces (replacement for PowerToys Workspaces)
+- `src/Workspaces.cs` is the engine and `src/WorkspacesWindow.cs` is the editor and result notice.
+  Open it from System menu → Workspaces. The menu style gained submenu support (arrow + popup) for this.
+- **Window identity:** program file name, plus `|profile:<dir>` / `|app:<id>` from the window's
+  `System.AppUserModel.RelaunchCommand`. Chrome writes `--profile-directory` there, so each Chrome
+  window maps to its profile. A saved key without a profile matches any profile (PowerToys imports).
+  - UWP frames use `uwp:<aumid>`.
+  - Steam's windows belong to steamwebhelper.exe, but their relaunch command is steam.exe, so the key
+    is steam.exe.
+  - Windows on other virtual desktops (cloaked by the shell) still count as open.
+- **Launch commands:**
+  - The window's relaunch command, if it has one.
+  - Store apps: the package app ID (`GetApplicationUserModelId` on the process, falling back to
+    AppxManifest; Spotify.exe isn't a declared entry point).
+  - Squirrel apps (Discord): `Update.exe --processStart`, because the `app-x.y.z` folder changes with
+    every update.
+  - Otherwise the exe.
+- **Arranging** (background thread, per-monitor DPI aware):
+  - Match open windows to apps: same key first, then title, then distance to the target.
+  - Open only unmatched apps that are checked, once per key.
+  - Wait for new windows, preferring windows that weren't there before. Skip tiny splash windows, and
+    re-match if a window disappears.
+  - Placement: `SetWindowPos` with the invisible-border delta (`DWMWA_EXTENDED_FRAME_BOUNDS` vs
+    `GetWindowRect`), done twice for DPI changes. Then maximize or minimize if saved that way.
+  - Re-check at 0.6, 1.5, 3 and 6 s and re-place anything that moved itself.
+  - Windows already in place aren't touched.
+  - The result notice appears once everything is placed; re-checks continue after.
+- **Monitor resolution:** same position and size, else same device name, else same size, else primary.
+  Positions scale if a monitor's resolution changed.
+- **Sign-in:** one workspace can run at sign-in, either opening missing apps or only arranging. It runs
+  only when Windows has been up less than 10 minutes, and watches for 90 s.
+- **Tested with Notepad:**
+  - Opened once and placed exactly (frame 1300,320 840×560).
+  - A second run opened nothing.
+  - Moved to the left monitor, "arrange only" brought it back.
+  - Maximized onto the middle monitor, then minimized, then back to normal all worked.
+- Imported the PowerToys workspace (8 apps). Its rects include invisible borders; a ≤8 px overhang
+  past a monitor edge is treated as border.
+
+## Round 12: FancyZones, microphone, full-screen games
+
+- **FancyZones zones under the menu bar.** FancyZones sizes its zones from the monitor work area and
+  re-reads it on `WM_SETTINGCHANGE(SPI_SETWORKAREA)`. MacBar sets the work area quietly (a broadcast
+  makes Explorer drop our strip), so FancyZones kept the full-screen 3440x1440 it read while the
+  Windows taskbar was being hidden. Its log showed `work area rect = 3440x1440`.
+  - `EnsureWorkArea` now also sends `WM_SETTINGCHANGE(SPI_SETWORKAREA)` to every top-level window
+    outside Explorer, from a background thread with `SMTO_ABORTIFHUNG`, 200 ms each.
+  - It has to be sent, not posted: `PostMessage` fails with error 1159 (ERROR_MESSAGE_SYNC_ONLY).
+  - Verified: FancyZones then logged 3440x1412.
+- **Microphone.** `AudioController.Inputs()` (capture endpoints; default = console role) and
+  `MicMuted()` / `SetMicMute()` on the default capture endpoint. The sound panel has an Input list
+  (`SetDefault` works for capture devices too) and an on/off switch in its header.
+- **Full-screen games.**
+  - While a full-screen window hides the bars, opening the app page (Windows key) shows both bars
+    again and raises them above the game.
+  - Holding the mouse at the top edge for 250 ms slides the menu bar down. It stays while the mouse
+    is on the bar, on any MacBar window (menus, panels) or a MacBar panel has focus, and hides 500 ms
+    after the mouse leaves.
+  - No peek while the game clips the cursor (`GetClipCursor` smaller than the virtual screen), so
+    in-game mouse movement doesn't trigger it.
+  - True exclusive full-screen (old DirectX) can't be drawn over; borderless/flip-model games can.
+  - `BringToFront` moved from Dock to BarWindow.
