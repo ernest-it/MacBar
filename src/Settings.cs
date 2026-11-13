@@ -19,6 +19,7 @@ namespace MacBar
         public int Opacity { get; set; }           // 0-100 tint opacity for both bars
         public int Blur { get; set; }              // 0 none, 1 light, 2 strong
         public int IconSize { get; set; }          // dock icon size (DIP)
+        public int DockMagnify { get; set; }       // hover magnification in percent (100 = off)
         public bool DockReservesSpace { get; set; }    // maximized windows stop above the dock (only when auto-hide is off)
         public int DockAutoHide { get; set; }          // 0 never, 1 always (macOS), 2 when a window overlaps (intellihide)
         public int SettingsVersion { get; set; }
@@ -41,7 +42,7 @@ namespace MacBar
 
         public Settings()
         {
-            Theme = "Auto"; Opacity = 20; Blur = 1; IconSize = 44; DockAutoHide = 1;
+            Theme = "Auto"; Opacity = 20; Blur = 1; IconSize = 44; DockMagnify = 140; DockAutoHide = 1;
             MenuBarReservesSpace = true; DockReservesSpace = false;
             ShowTrayIcons = true; ShowBatteryPercent = true; ShowLighting = true; OpenRgbProfile = "";
             Fahrenheit = true; WeatherLocation = ""; Pinned = new List<PinnedApp>(); HiddenTrayIcons = new List<string>();
@@ -65,6 +66,8 @@ namespace MacBar
                         s.Blur = Math.Max(0, Math.Min(2, s.Blur));
                         s.IconSize = Math.Max(28, Math.Min(80, s.IconSize));
                         s.DockAutoHide = Math.Max(0, Math.Min(2, s.DockAutoHide));
+                        if (s.DockMagnify == 0) s.DockMagnify = 140; // settings saved before magnification existed
+                        s.DockMagnify = Math.Max(100, Math.Min(200, s.DockMagnify));
                         if (s.SettingsVersion < 2)
                         {
                             // v2: slightly smaller default icons, dock auto-hides by default.

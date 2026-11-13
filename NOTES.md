@@ -408,6 +408,28 @@ caption, so they don't trigger it.
   - True exclusive full-screen (old DirectX) can't be drawn over; borderless/flip-model games can.
   - `BringToFront` moved from Dock to BarWindow.
 
+
+## Round 13: settings redesign, dock magnification
+
+- **Settings window** rebuilt in the style of the Ubuntu version's libadwaita preferences.
+  - Tabs: Menu bar, Dock, Weather, General.
+  - Grouped rounded cards, one setting per row (title, subtitle, control on the right).
+  - Controls: switches, MacBar-styled dropdowns (a ContextMenu), MiniSliders, pill buttons and a
+    slim scrollbar.
+  - Follows the MacBar theme, including a dark title bar via DWMWA_USE_IMMERSIVE_DARK_MODE.
+  - Changing the theme rebuilds the window in the new colors.
+  - The General tab links to the Workspaces editor and shows the version.
+- **Dock magnification** (`DockMagnify`, default 140%, set under Settings → Dock): the hovered icon
+  grows to 1.4× and its neighbors to ~1.18× / 1.06×, anchored at the bottom. This replaces the old 1.1×
+  single-icon hover.
+  - The dock window now has transparent headroom above the bar (`Bar.Margin` top =
+    `Headroom()`), so big and bouncing icons aren't clipped. The old rounded window region is removed.
+  - Transparent pixels of a layered window pass clicks through, so the headroom doesn't block clicks.
+  - Reserve-space thickness, the auto-hide "over the dock" test and intellihide overlap now use the
+    bar's top (`baseY + pxHead`), not the window's.
+- Pitfall: XAML in a C# verbatim string inserted through a single-quoted shell command lost all its
+  `'` quotes. XamlReader then threw inside `ShowSettings`, and the window silently never opened.
+
 ## Round 14 — Ubuntu version moved into this repo (2026-11-13)
 - The Ubuntu port (GNOME Shell extension) now lives in `ubuntu/`; its own dev log is `ubuntu/NOTES.md`.
   It was briefly published as a separate repo, ernest-it/MacBar-Ubuntu.

@@ -57,6 +57,8 @@ namespace MacBar
             Bar.Child = panel;
             Bar.BorderThickness = new Thickness(1);
             Bar.Padding = new Thickness(8, 6, 8, 2);
+            panel.Background = Brushes.Transparent; // no gaps between icons, so moving across doesn't reset the zoom
+            panel.MouseLeave += delegate { Magnify(null); };
 
             debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
             debounce.Tick += delegate { debounce.Stop(); Refresh(); };
@@ -102,10 +104,15 @@ namespace MacBar
             Bar.BorderBrush = Theme.Dark ? new SolidColorBrush(Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF)) : new SolidColorBrush(Color.FromArgb(0x30, 0x00, 0x00, 0x00));
             separator.Background = Theme.FgAlpha(0x40);
             panel.Effect = Theme.Halo();
+            // Transparent space above the dock for magnified and bouncing icons (clicks pass through it).
+            Bar.Margin = new Thickness(0, Headroom(), 0, 0);
             Reposition();
         }
 
         double Radius() { return Math.Round((S.IconSize + 14) * 0.32); }
+
+        /// <summary>Room above the dock (DIP) for an icon at full magnification or mid-bounce.</summary>
+        double Headroom() { return Math.Ceiling(Math.Max(14, S.IconSize * (S.DockMagnify / 100.0 - 1))) + 2; }
 
         /// <summary>Icon size in real screen pixels, so icons are drawn 1:1 without extra scaling blur.</summary>
         int IconPx() { return (int)Math.Round(S.IconSize * Scale); }
@@ -119,22 +126,24 @@ namespace MacBar
             double sc = Scale;
             int sw = Native.GetSystemMetrics(0), sh = Native.GetSystemMetrics(1);
             int w = (int)Math.Round(ActualWidth * sc), h = (int)Math.Round(ActualHeight * sc);
+            int head = (int)Math.Round(Headroom() * sc), barH = Math.Max(1, h - head);
             int gap = (int)Math.Round(GapDip * sc);
             // Always registered so we hear about full-screen apps; thickness 0 when not reserving space.
             if (!AppBar.Registered) AppBar.Register(Hwnd);
             bool reserve = S.DockReservesSpace && S.DockAutoHide == 0;
-            int thick = reserve ? h + gap * 2 : 0;
+            int thick = reserve ? barH + gap * 2 : 0;
             ReservedPx = thick;
             RECT rc = AppBar.SetPos(AppBar.ABE_BOTTOM, new RECT { Left = 0, Top = sh - thick, Right = sw, Bottom = sh }, thick);
             int bottom = reserve ? rc.Bottom : sh;
-            baseX = (sw - w) / 2; baseY = bottom - gap - h; pxW = w; pxH = h; pxGap = gap;
+            baseX = (sw - w) / 2; baseY = bottom - gap - h; pxW = w; pxH = h; pxGap = gap; pxHead = head;
             Place();
-            Theme.SetRegion(Hwnd, w, h, (int)Math.Round(Radius() * sc));
+            // No clipping region: the window is taller than the dock so magnified icons can grow above it.
+            Native.SetWindowRgn(Hwnd, IntPtr.Zero, true);
         }
 
         // ---------- auto-hide ----------
         // progress: 0 = fully shown, 1 = fully hidden below the screen edge.
-        int baseX, baseY, pxW, pxH, pxGap;
+        int baseX, baseY, pxW, pxH, pxGap, pxHead;
         double progress, target;
         DateTime lastWanted = DateTime.Now;
         bool menuOpen, overlapCache; DateTime overlapCheckedAt;
@@ -159,7 +168,7 @@ namespace MacBar
                 POINT p; Native.GetCursorPos(out p);
                 int sw = Native.GetSystemMetrics(0), sh = Native.GetSystemMetrics(1);
                 bool atEdge = p.Y >= sh - 2 && p.Y < sh + 2 && p.X >= 0 && p.X < sw;
-                bool overDock = progress < 0.6 && p.X >= baseX - 12 && p.X <= baseX + pxW + 12 && p.Y >= baseY - 16 && p.Y < sh + 2;
+                bool overDock = progress < 0.6 && p.X >= baseX - 12 && p.X <= baseX + pxW + 12 && p.Y >= baseY + pxHead - 16 && p.Y < sh + 2;
                 bool busy = menuOpen || dragging || pressed != null || HoldShown;
                 bool wantShown = atEdge || overDock || busy;
                 if (mode == 2 && !wantShown) wantShown = !OverlapsFocusedWindow();
@@ -184,7 +193,7 @@ namespace MacBar
             string cls = Native.GetClass(fg);
             if (cls == "Progman" || cls == "WorkerW" || Native.IsIconic(fg)) { overlapCache = false; return false; }
             RECT r; Native.GetWindowRect(fg, out r);
-            overlapCache = r.Right > baseX && r.Left < baseX + pxW && r.Bottom > baseY && r.Top < baseY + pxH;
+            overlapCache = r.Right > baseX && r.Left < baseX + pxW && r.Bottom > baseY + pxHead && r.Top < baseY + pxH;
             return overlapCache;
         }
 
@@ -207,8 +216,7 @@ namespace MacBar
             ToolTipService.SetPlacement(stack, System.Windows.Controls.Primitives.PlacementMode.Top);
             ToolTipService.SetInitialShowDelay(stack, 250);
             ToolTipService.SetVerticalOffset(stack, -4);
-            stack.MouseEnter += delegate { Animate(scale, 1.1); };
-            stack.MouseLeave += delegate { Animate(scale, 1.0); };
+            stack.MouseEnter += delegate { Magnify(stack); };
             stack.MouseLeftButtonUp += delegate { App.Instance.ToggleAppsPage(); };
             return stack;
         }
@@ -307,8 +315,7 @@ namespace MacBar
             ToolTipService.SetVerticalOffset(stack, -4);
             stack.ToolTip = item.Name;
 
-            stack.MouseEnter += delegate { Animate(item.Scale, 1.1); };
-            stack.MouseLeave += delegate { Animate(item.Scale, 1.0); };
+            stack.MouseEnter += delegate { Magnify(stack); };
             stack.MouseLeftButtonDown += delegate (object s, MouseButtonEventArgs e)
             {
                 pressed = item; pressPoint = e.GetPosition(panel); dragging = false;
@@ -333,6 +340,44 @@ namespace MacBar
             };
             stack.MouseRightButtonUp += delegate { ShowMenu(item, stack); };
             item.View = stack;
+        }
+
+        /// <summary>
+        /// macOS-style magnification: the icon under the mouse grows the most and its neighbors a little,
+        /// all anchored at the bottom. over == null puts every icon back to normal size.
+        /// </summary>
+        void Magnify(UIElement over)
+        {
+            double mag = S.DockMagnify / 100.0;
+            var icons = new List<KeyValuePair<UIElement, ScaleTransform>>();
+            foreach (UIElement c in panel.Children)
+            {
+                var st = ScaleOf(c);
+                if (st != null) icons.Add(new KeyValuePair<UIElement, ScaleTransform>(c, st));
+            }
+            int idx = over == null ? -1 : icons.FindIndex(k => k.Key == over);
+            for (int i = 0; i < icons.Count; i++)
+            {
+                double sc = 1;
+                if (idx >= 0 && mag > 1.001)
+                {
+                    int d = Math.Abs(i - idx);
+                    sc = d == 0 ? mag : d == 1 ? 1 + (mag - 1) * 0.45 : d == 2 ? 1 + (mag - 1) * 0.15 : 1;
+                }
+                Animate(icons[i].Value, sc);
+            }
+        }
+
+        static ScaleTransform ScaleOf(UIElement e)
+        {
+            var p = e as Panel;
+            if (p == null || p.Children.Count == 0) return null;
+            var t = p.Children[0].RenderTransform;
+            var st = t as ScaleTransform;
+            if (st != null) return st;
+            var g = t as TransformGroup;
+            if (g != null) foreach (var c in g.Children) if (c is ScaleTransform) return (ScaleTransform)c;
+            return null;
         }
 
         static void Animate(ScaleTransform t, double to)
