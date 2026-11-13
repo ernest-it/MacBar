@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.macbar" path="/org/gnome/shell/extensions/macbar/">
+    <!-- Menu bar -->
+    <key name="bar-opacity" type="d"><default>0.2</default><summary>Menu bar and dock background opacity (0-1)</summary></key>
+    <key name="blur" type="s"><default>'light'</default><summary>Blur behind the dock: none, light, strong</summary></key>
+    <key name="show-app-name" type="b"><default>true</default><summary>Show the active app name</summary></key>
+    <key name="show-now-playing" type="b"><default>true</default><summary>Show the Now Playing island</summary></key>
+    <key name="show-weather" type="b"><default>true</default><summary>Show the weather</summary></key>
+    <key name="show-sound" type="b"><default>true</default><summary>Show the sound menu</summary></key>
+    <key name="show-lighting" type="b"><default>true</default><summary>Show OpenRGB lighting profiles</summary></key>
+    <key name="clock-on-right" type="b"><default>true</default><summary>Move the clock to the right end like macOS</summary></key>
+    <key name="peek-fullscreen" type="b"><default>true</default><summary>Bring the menu bar down over full-screen apps when the mouse is at the top edge</summary></key>
+    <key name="super-opens-apps" type="b"><default>true</default><summary>The Super key opens the app grid</summary></key>
+    <!-- Dock -->
+    <key name="show-dock" type="b"><default>true</default><summary>Show the dock</summary></key>
+    <key name="dock-autohide" type="s"><default>'intellihide'</default><summary>never, always, intellihide</summary></key>
+    <key name="dock-icon-size" type="i"><range min="24" max="96"/><default>48</default><summary>Dock icon size</summary></key>
+    <key name="dock-magnify" type="d"><default>1.4</default><summary>Hover magnification (1 = off)</summary></key>
+    <!-- Weather -->
+    <key name="weather-city" type="s"><default>''</default><summary>Weather city name</summary></key>
+    <key name="weather-lat" type="d"><default>40.7128</default></key>
+    <key name="weather-lon" type="d"><default>-74.006</default></key>
+    <key name="weather-fahrenheit" type="b"><default>true</default></key>
+    <key name="weather-cache" type="s"><default>''</default><summary>Last weather response (works offline)</summary></key>
+    <!-- Lighting -->
+    <key name="openrgb-profile" type="s"><default>''</default><summary>Last loaded OpenRGB profile</summary></key>
+    <key name="openrgb-port" type="i"><default>6742</default></key>
+  </schema>
+</schemalist>

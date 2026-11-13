@@ -1,0 +1,10 @@
+{
+  "uuid": "macbar@ernest-it.github.io",
+  "name": "MacBar",
+  "description": "A macOS-style menu bar and dock for Ubuntu: system menu, app name, Now Playing island, weather, sound with output and microphone switching, OpenRGB lighting, a magnifying dock and window Workspaces.",
+  "shell-version": ["45", "46", "47", "48", "49"],
+  "url": "https://github.com/ernest-it/MacBar",
+  "settings-schema": "org.gnome.shell.extensions.macbar",
+  "gettext-domain": "macbar",
+  "version-name": "1.0.0"
+}

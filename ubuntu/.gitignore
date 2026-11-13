@@ -1,0 +1,5 @@
+test/out/
+test/*.log
+dist/
+schemas/gschemas.compiled
+*.compiled

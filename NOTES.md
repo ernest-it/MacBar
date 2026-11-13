@@ -407,3 +407,12 @@ caption, so they don't trigger it.
     in-game mouse movement doesn't trigger it.
   - True exclusive full-screen (old DirectX) can't be drawn over; borderless/flip-model games can.
   - `BringToFront` moved from Dock to BarWindow.
+
+## Round 14 — Ubuntu version moved into this repo (2026-11-13)
+- The Ubuntu port (GNOME Shell extension) now lives in `ubuntu/`; its own dev log is `ubuntu/NOTES.md`.
+  It was briefly published as a separate repo, ernest-it/MacBar-Ubuntu.
+- Install links point at this repo: `releases/latest/download/install.sh` and
+  `macbar@ernest-it.github.io.shell-extension.zip`.
+- **Every release must carry the Ubuntu assets** (`ubuntu/dist/` zip, `install.sh`, `uninstall.sh`) next
+  to `MacBar-Setup.exe`, or the Ubuntu one-line installer breaks when that release becomes "latest".
+- Build the Ubuntu zip from `ubuntu/` with Docker (`test/pack.sh`).

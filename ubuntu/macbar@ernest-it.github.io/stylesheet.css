@@ -1,0 +1,62 @@
+/* Menu bar */
+#panel.macbar-panel { transition-duration: 0ms; }
+#panel.macbar-panel .panel-button { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); icon-shadow: 0 1px 2px rgba(0, 0, 0, 0.45); }
+#panel.macbar-panel .panel-button.clock-display { font-weight: normal; }
+.macbar-logo { icon-size: 16px; }
+.macbar-app-name { font-weight: bold; }
+.macbar-temp { margin-left: 4px; }
+.macbar-menu-title { font-weight: bold; padding-top: 4px; }
+.macbar-menu-heading { font-size: 0.85em; font-weight: bold; color: rgba(255, 255, 255, 0.55); }
+.macbar-credit { font-size: 0.8em; color: rgba(255, 255, 255, 0.5); }
+
+/* Sound */
+.macbar-slider-row { spacing: 8px; }
+.macbar-pct { min-width: 44px; text-align: right; font-size: 0.9em; }
+.macbar-icon-button { padding: 4px; border-radius: 6px; }
+.macbar-icon-button:hover { background-color: rgba(255, 255, 255, 0.1); }
+.macbar-device-item { spacing: 10px; }
+.macbar-badge { width: 26px; height: 26px; border-radius: 13px; background-color: rgba(255, 255, 255, 0.13); }
+.macbar-badge-active { background-color: #3584e4; color: white; }
+.macbar-device-name.macbar-selected { font-weight: bold; }
+
+/* Weather */
+.macbar-weather-head { spacing: 12px; }
+.macbar-weather-city { font-weight: bold; }
+.macbar-weather-big { font-size: 2.4em; font-weight: 300; }
+.macbar-weather-desc { color: rgba(255, 255, 255, 0.75); }
+.macbar-weather-detail { font-size: 0.9em; color: rgba(255, 255, 255, 0.75); }
+.macbar-forecast-row { spacing: 12px; }
+.macbar-forecast-day { min-width: 44px; }
+
+/* Lighting */
+.macbar-swatch { width: 14px; height: 14px; border-radius: 7px; margin-right: 6px; }
+
+/* Now Playing island */
+.macbar-island-box { spacing: 6px; }
+.macbar-island-art { width: 18px; height: 18px; border-radius: 4px; }
+.macbar-island-title { max-width: 260px; }
+.macbar-eq { spacing: 2px; height: 14px; }
+.macbar-eq-bar { width: 3px; height: 3px; border-radius: 1px; background-color: #34c759; }
+.macbar-player { padding: 8px 12px; }
+.macbar-player-box { spacing: 6px; min-width: 300px; }
+.macbar-player-art { width: 220px; height: 220px; border-radius: 12px; background-color: rgba(255, 255, 255, 0.08); }
+.macbar-player-title { font-weight: bold; font-size: 1.1em; }
+.macbar-player-artist { color: rgba(255, 255, 255, 0.7); }
+.macbar-player-times { font-size: 0.8em; color: rgba(255, 255, 255, 0.6); }
+.macbar-player-controls { spacing: 18px; }
+.macbar-player-button { padding: 6px; border-radius: 99px; }
+.macbar-player-button:hover { background-color: rgba(255, 255, 255, 0.12); }
+
+/* Dock */
+.macbar-dock {
+  border-radius: 20px;
+  padding: 6px 8px 2px 8px;
+  spacing: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+.macbar-dock-item { padding: 2px; border-radius: 12px; }
+.macbar-dock-item:focus { background-color: rgba(255, 255, 255, 0.1); }
+.macbar-apps-icon { border-radius: 12px; background-gradient-direction: vertical; background-gradient-start: #5e5ce6; background-gradient-end: #3a3a8c; color: white; }
+.macbar-dock-dot { width: 4px; height: 4px; border-radius: 2px; background-color: rgba(255, 255, 255, 0.9); margin-top: 2px; }
+.macbar-dock-separator { width: 1px; margin: 6px 4px 8px 4px; background-color: rgba(255, 255, 255, 0.25); }
