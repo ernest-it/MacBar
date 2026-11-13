@@ -1,6 +1,6 @@
 #!/bin/bash
 # Turns MacBar on or off for the current user (run as that user, inside their session).
-#   --enable   turn MacBar on and Ubuntu Dock off
+#   --enable   turn MacBar on (MacBar itself turns Ubuntu Dock off once it is running)
 #   --login    same as --enable, but only the first time (run at sign-in by /etc/xdg/autostart)
 #   --remove   turn MacBar off and Ubuntu Dock back on (run when the package is removed)
 UUID=macbar@ernest-it.github.io
@@ -27,7 +27,6 @@ case "$1" in
     gsettings set org.gnome.shell disable-user-extensions false
     list_del disabled-extensions $UUID
     list_add enabled-extensions $UUID
-    for d in $DOCKS; do list_del enabled-extensions $d; list_add disabled-extensions $d; done
     mkdir -p "$(dirname "$MARK")" && touch "$MARK" ;;
   --remove)
     list_del enabled-extensions $UUID

@@ -6,5 +6,5 @@
   "url": "https://github.com/ernest-it/MacBar",
   "settings-schema": "org.gnome.shell.extensions.macbar",
   "gettext-domain": "macbar",
-  "version-name": "1.0.0"
+  "version-name": "1.0.1"
 }

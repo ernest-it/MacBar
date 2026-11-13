@@ -445,3 +445,25 @@ caption, so they don't trigger it.
     running, checks the shell loads it (State ACTIVE) and removes it. Passed on 24.04, 25.04 and 25.10.
 - **Every release must carry `MacBar-Ubuntu.deb`** next to `MacBar-Setup.exe`, so the latest release
   always has both.
+
+## Round 15 — dock hiding setting, smoother animations, Ubuntu Dock hand-off (2026-11-13)
+- Settings → Dock has a "Hiding" card: a **Hide the dock automatically** switch, then "When to hide"
+  (Always like macOS / When a window overlaps it) while it's on, or "Keep maximized windows above
+  the dock" while it's off. New installs default to a dock that never hides (and reserves its space).
+  Same on Ubuntu (an Adw.ExpanderRow with an enable switch; schema default `never`).
+- Smoothness (Windows):
+  - The dock slide ran one fixed step per 16 ms DispatcherTimer tick, but the timer really fires on the
+    ~15.6 ms system tick and unevenly, so the slide stuttered. The timer now only decides shown/hidden;
+    the slide runs on `CompositionTarget.Rendering` (once per frame) and advances by elapsed time (200 ms).
+  - Removed the halo DropShadowEffect from the dock panel (the dock has its own tint). With it, every
+    frame of the hover magnification re-rendered an effect over the whole panel.
+  - The app page (Windows key) rebuilt every page of tiles on each open. It now reuses them unless the
+    app list or layout changed.
+- Smoothness (Ubuntu): the dock checks the pointer every 40 ms instead of 100 ms, so it starts to slide
+  up as soon as the mouse reaches the edge.
+- Ubuntu bug from the first real install (24.04.4): the .deb's postinst turned Ubuntu Dock off right away,
+  but GNOME only loads a newly installed extension at the next sign-in, so until then there was no dock
+  and the plain GNOME top bar. Now MacBar itself turns Ubuntu Dock / Dash to Dock off in `enable()`
+  (after `startup-complete` at sign-in: Ubuntu Dock throws if it's disabled before its startup animation)
+  and back on in `disable()` unless the screen is just locking. `macbar-setup --enable` only enables
+  MacBar. `test/deb-test.sh` now installs the real Ubuntu Dock and checks the hand-off both ways.

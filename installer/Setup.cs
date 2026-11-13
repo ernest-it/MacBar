@@ -12,13 +12,13 @@ using Microsoft.Win32;
 
 [assembly: AssemblyTitle("MacBar Setup")]
 [assembly: AssemblyProduct("MacBar")]
-[assembly: AssemblyVersion("1.4.1.0")]
-[assembly: AssemblyFileVersion("1.4.1.0")]
+[assembly: AssemblyVersion("1.4.2.0")]
+[assembly: AssemblyFileVersion("1.4.2.0")]
 
 static class Setup
 {
     const string AppName = "MacBar";
-    const string Version = "1.4.1";
+    const string Version = "1.4.2";
     const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\MacBar";
     static readonly string InstallDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"Programs\MacBar");

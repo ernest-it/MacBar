@@ -103,7 +103,9 @@ namespace MacBar
             Bar.CornerRadius = new CornerRadius(Radius());
             Bar.BorderBrush = Theme.Dark ? new SolidColorBrush(Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF)) : new SolidColorBrush(Color.FromArgb(0x30, 0x00, 0x00, 0x00));
             separator.Background = Theme.FgAlpha(0x40);
-            panel.Effect = Theme.Halo();
+            // No halo effect on the dock: it has its own tint behind the icons, and an effect over the whole
+            // panel had to be redrawn on every frame of the hover magnification.
+            panel.Effect = null;
             // Transparent space above the dock for magnified and bouncing icons (clicks pass through it).
             Bar.Margin = new Thickness(0, Headroom(), 0, 0);
             Reposition();
@@ -177,10 +179,26 @@ namespace MacBar
                 hide = !wantShown && (DateTime.Now - lastWanted).TotalMilliseconds > (mode == 2 ? 150 : 450);
             }
             target = hide ? 1 : 0;
-            if (progress == target) return;
-            double step = 0.016 / 0.18; // ~180 ms slide
+            if (progress != target && !sliding)
+            {
+                // Animate on WPF's render clock (once per frame) and by elapsed time, not timer ticks:
+                // DispatcherTimer only fires every ~15.6 ms and unevenly, which made the slide stutter.
+                sliding = true; slideClock.Restart();
+                CompositionTarget.Rendering += SlideFrame;
+            }
+        }
+
+        bool sliding;
+        readonly System.Diagnostics.Stopwatch slideClock = new System.Diagnostics.Stopwatch();
+        const double SlideSeconds = 0.2;
+
+        void SlideFrame(object sender, EventArgs e)
+        {
+            double dt = Math.Min(0.05, slideClock.Elapsed.TotalSeconds); slideClock.Restart();
+            double step = dt / SlideSeconds;
             progress = target > progress ? Math.Min(target, progress + step) : Math.Max(target, progress - step);
             Place();
+            if (progress == target) { CompositionTarget.Rendering -= SlideFrame; sliding = false; }
         }
 
         /// <summary>Intellihide: is the focused, non-minimized app window overlapping the dock's area?</summary>

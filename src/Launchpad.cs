@@ -354,7 +354,11 @@ namespace MacBar
                 pagesHost.Visibility = Visibility.Visible;
                 topResult = shown.Count > 0 ? (Action)delegate { Launch(shown[0]); } : null;
                 FileSearch.Query("", 0, Dispatcher, delegate { });
-                BuildPages();
+                // Reuse the pages from last time when nothing changed, so the Windows key opens the page
+                // instantly instead of rebuilding every tile first.
+                string key = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(all) + "|" + all.Count + "|" + cols + "x" + rows + "|" + cellW + "x" + cellH + "|" + Width;
+                if (key != builtKey || pages.Children.Count == 0) { BuildPages(); builtKey = key; }
+                else SetPage(0, false);
             }
             else
             {
@@ -445,6 +449,8 @@ namespace MacBar
             ShellUtil.Open(target);
             Dismiss();
         }
+
+        string builtKey;
 
         void BuildPages()
         {

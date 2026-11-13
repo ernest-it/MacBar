@@ -14,7 +14,7 @@
     <key name="super-opens-apps" type="b"><default>true</default><summary>The Super key opens the app grid</summary></key>
     <!-- Dock -->
     <key name="show-dock" type="b"><default>true</default><summary>Show the dock</summary></key>
-    <key name="dock-autohide" type="s"><default>'intellihide'</default><summary>never, always, intellihide</summary></key>
+    <key name="dock-autohide" type="s"><default>'never'</default><summary>never, always, intellihide</summary></key>
     <key name="dock-icon-size" type="i"><range min="24" max="96"/><default>48</default><summary>Dock icon size</summary></key>
     <key name="dock-magnify" type="d"><default>1.4</default><summary>Hover magnification (1 = off)</summary></key>
     <!-- Weather -->

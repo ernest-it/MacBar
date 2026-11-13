@@ -223,7 +223,8 @@ export class Dock {
         ];
         this._overviewDash(true);
         this._syncVisible();
-        this._timer = timeout(100, () => { this._tick(); return true; });
+        // 25 checks a second: the dock starts sliding up within ~40 ms of the mouse reaching the edge.
+        this._timer = timeout(40, () => { this._tick(); return true; });
     }
 
     get iconSize() { return this._settings.get_int('dock-icon-size'); }

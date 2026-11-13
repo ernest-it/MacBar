@@ -42,8 +42,8 @@ namespace MacBar
 
         public Settings()
         {
-            Theme = "Auto"; Opacity = 20; Blur = 1; IconSize = 44; DockMagnify = 140; DockAutoHide = 1;
-            MenuBarReservesSpace = true; DockReservesSpace = false;
+            Theme = "Auto"; Opacity = 20; Blur = 1; IconSize = 44; DockMagnify = 140; DockAutoHide = 0;
+            MenuBarReservesSpace = true; DockReservesSpace = true;
             ShowTrayIcons = true; ShowBatteryPercent = true; ShowLighting = true; OpenRgbProfile = "";
             Fahrenheit = true; WeatherLocation = ""; Pinned = new List<PinnedApp>(); HiddenTrayIcons = new List<string>();
         }

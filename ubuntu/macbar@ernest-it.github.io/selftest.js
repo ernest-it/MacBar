@@ -202,6 +202,27 @@ export class SelfTest {
         await sleep(6000);
         await this._shot('09-prefs');
         const st = this._ext.getSettings();
+        // Click the Dock tab (a virtual pointer, since prefs run in their own process), then flip auto-hide.
+        const tab = global.get_window_actors().map(a => a.meta_window).find(w => w.get_title()?.includes('MacBar') || w.get_wm_class()?.includes('Extensions'));
+        if (tab) {
+            const r = tab.get_frame_rect();
+            const dev = Clutter.get_default_backend().get_default_seat().create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+            const t = () => GLib.get_monotonic_time();
+            console.log(`MACBAR-TEST INFO prefs window ${tab.get_title()} ${r.x},${r.y} ${r.width}x${r.height}`);
+            await sleep(500);
+            this._warp(r.x + r.width / 2 - 65, r.y + 22);
+            await sleep(300);
+            dev.notify_absolute_motion(t(), r.x + r.width / 2 - 65, r.y + 22);
+            await sleep(200);
+            dev.notify_button(t(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.PRESSED);
+            dev.notify_button(t(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.RELEASED);
+            await sleep(800);
+            await this._shot('09b-prefs-dock');
+            st.set_string('dock-autohide', 'intellihide');
+            await sleep(800);
+            await this._shot('09c-prefs-dock-autohide');
+            st.set_string('dock-autohide', 'never');
+        }
         st.set_string('blur', 'none');
         await sleep(800);
         await this._shot('10-no-blur');

@@ -335,10 +335,20 @@ namespace MacBar
         void BuildDock()
         {
             var dock = Group("Dock", "Right-click an app in the dock to keep it or remove it. Drag icons to reorder them.");
-            Row(dock, "Hide the dock", null, DropDown(new[] { "Never", "Always (like macOS)", "When a window overlaps it" }, s.DockAutoHide, i => { s.DockAutoHide = i; Save(); }));
             Row(dock, "Icon size", null, SliderControl(32, 72, s.IconSize, " px", v => s.IconSize = v));
             Row(dock, "Hover magnification", "How much an icon grows under the mouse (100% = off)", SliderControl(100, 200, s.DockMagnify, "%", v => s.DockMagnify = v));
-            Toggle(dock, "Keep maximized windows above the dock", "Only when the dock never hides", s.DockReservesSpace, v => s.DockReservesSpace = v);
+
+            var hiding = Group("Hiding", null);
+            bool autoHide = s.DockAutoHide != 0;
+            Toggle(hiding, "Hide the dock automatically",
+                autoHide ? "The dock slides away and comes back when you need it" : "Off: the dock always stays on screen",
+                autoHide, v => { s.DockAutoHide = v ? 1 : 0; BuildShell(); });
+            if (autoHide)
+                Row(hiding, "When to hide", s.DockAutoHide == 2 ? "It comes back when no window covers it" : "Move the mouse to the bottom edge to show it",
+                    DropDown(new[] { "Always (like macOS)", "When a window overlaps it" },
+                    s.DockAutoHide == 2 ? 1 : 0, i => { s.DockAutoHide = i == 1 ? 2 : 1; Save(); BuildShell(); }));
+            else
+                Toggle(hiding, "Keep maximized windows above the dock", "Maximized windows stop at the dock instead of going under it", s.DockReservesSpace, v => s.DockReservesSpace = v);
         }
 
         void BuildWeather()

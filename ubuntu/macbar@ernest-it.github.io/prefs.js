@@ -97,11 +97,10 @@ export default class MacBarPrefs extends ExtensionPreferences {
         const dg = new Adw.PreferencesGroup({title: 'Dock',
             description: 'Right-click an app in the dock to keep it or remove it. Drag icons to reorder them, or drag apps in from the app grid.'});
         dg.add(switchRow(s, 'show-dock', 'Show the dock'));
-        dg.add(comboRow(s, 'dock-autohide', 'Hide the dock', ['never', 'always', 'intellihide'],
-            ['Never (windows stop above it)', 'Always (show at the bottom edge)', 'When a window overlaps it']));
         dg.add(spinRow(s, 'dock-icon-size', 'Icon size', 24, 96, 2, 0, true));
         dg.add(spinRow(s, 'dock-magnify', 'Hover magnification', 1, 2, 0.05, 2, false));
         dock.add(dg);
+        dock.add(this._hidingGroup(s));
         window.add(dock);
 
         // ----- Weather -----
@@ -109,6 +108,40 @@ export default class MacBarPrefs extends ExtensionPreferences {
 
         // ----- Workspaces -----
         window.add(this._workspacesPage());
+    }
+
+    _hidingGroup(s) {
+        const group = new Adw.PreferencesGroup({title: 'Hiding'});
+        // Off: the dock always stays on screen and maximized windows stop above it.
+        const auto = new Adw.ExpanderRow({title: 'Hide the dock automatically', show_enable_switch: true,
+            subtitle: 'Off: the dock always stays on screen'});
+        const styles = ['always', 'intellihide'];
+        const when = new Adw.ComboRow({title: 'When to hide',
+            model: Gtk.StringList.new(['Always (like macOS): show it at the bottom edge', 'When a window overlaps it'])});
+        auto.add_row(when);
+        group.add(auto);
+        let syncing = false;
+        const sync = () => {
+            syncing = true;
+            const mode = s.get_string('dock-autohide');
+            auto.enable_expansion = mode !== 'never';
+            auto.expanded = mode !== 'never';
+            auto.subtitle = mode === 'never' ? 'Off: the dock always stays on screen'
+                : 'The dock slides away and comes back when you need it';
+            if (mode !== 'never') when.selected = Math.max(0, styles.indexOf(mode));
+            syncing = false;
+        };
+        sync();
+        auto.connect('notify::enable-expansion', () => {
+            if (syncing) return;
+            s.set_string('dock-autohide', auto.enable_expansion ? styles[when.selected] : 'never');
+        });
+        when.connect('notify::selected', () => {
+            if (!syncing && auto.enable_expansion) s.set_string('dock-autohide', styles[when.selected]);
+        });
+        const id = s.connect('changed::dock-autohide', sync);
+        group.connect('destroy', () => s.disconnect(id));
+        return group;
     }
 
     _weatherPage(s) {

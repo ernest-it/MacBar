@@ -63,8 +63,7 @@ Settings: click the logo at the top left, then **MacBar Settings…**.
   - New Window and the app's own actions (e.g. New Incognito Window)
   - Keep in Dock / Remove from Dock
   - Quit
-- Hiding options:
-  - never (maximized windows stop above the dock)
+- Stays on screen by default. Turn on **Hide the dock automatically** (Settings → Dock) to hide it:
   - always (macOS-style; it slides up when the mouse reaches the bottom edge)
   - only when a window overlaps it (Ubuntu-style)
 - Translucent with blur.
