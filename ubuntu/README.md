@@ -11,20 +11,18 @@ It needs Ubuntu 24.04 or newer (GNOME 45–49).
 | ![Sound](docs/sound.png) | ![Weather](docs/weather.png) | ![System menu](docs/system-menu.png) |
 
 ## Install
+Download **MacBar-Ubuntu.deb** from the [latest release](https://github.com/ernest-it/MacBar/releases/latest)
+and install it:
 
 ```
-curl -fsSL https://github.com/ernest-it/MacBar/releases/latest/download/install.sh | bash
+cd ~/Downloads && sudo apt install ./MacBar-Ubuntu.deb
 ```
 
-Then log out and back in. The installer works for your user only (no sudo). It turns off Ubuntu Dock,
-which would sit under MacBar's dock; `uninstall.sh` turns it back on.
+Then log out and back in. MacBar turns itself on and turns Ubuntu Dock off (it would sit under MacBar's
+dock). Other people on the same computer get it the next time they sign in.
 
-You can also download `install.sh` and `macbar@ernest-it.github.io.shell-extension.zip` from the
-[latest release](https://github.com/ernest-it/MacBar/releases/latest), put them in one
-folder and run `bash install.sh`.
-
-To remove it, run
-`curl -fsSL https://github.com/ernest-it/MacBar/releases/latest/download/uninstall.sh | bash`.
+To remove it: `sudo apt remove macbar`, then log out and back in. That turns Ubuntu Dock back on.
+Your saved workspaces stay in `~/.config/macbar`.
 
 Settings: click the logo at the top left, then **MacBar Settings…**.
 
@@ -117,6 +115,12 @@ Settings: click the logo at the top left, then **MacBar Settings…**.
 cd ubuntu
 docker build -t macbar-gnome test
 docker run --rm --user root -v "$PWD:/src" -v "$PWD/test/out:/out" macbar-gnome bash /src/test/docker.sh
+```
+
+Build the package and test installing and removing it with apt:
+```
+docker run --rm --user root -v "$PWD:/src" macbar-gnome bash /src/test/build-deb.sh
+docker run --rm --user root -v "$PWD:/src" macbar-gnome bash /src/test/deb-test.sh
 ```
 
 Weather data by [Open-Meteo.com](https://open-meteo.com) (CC BY 4.0).

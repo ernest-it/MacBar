@@ -1,0 +1,13 @@
+Package: macbar
+Version: @VERSION@
+Architecture: all
+Maintainer: ernest-it <161004105+ernest-it@users.noreply.github.com>
+Depends: gnome-shell (>= 45), gir1.2-soup-3.0
+Section: gnome
+Priority: optional
+Homepage: https://github.com/ernest-it/MacBar
+Description: macOS-style menu bar and dock for GNOME (Ubuntu)
+ MacBar is a GNOME Shell extension: a menu bar with a system menu, the
+ active app's name, a Now Playing island, weather, sound with output and
+ microphone switching and OpenRGB lighting, plus a magnifying dock and
+ window Workspaces. It turns Ubuntu Dock off while it is on.

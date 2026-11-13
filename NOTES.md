@@ -433,8 +433,15 @@ caption, so they don't trigger it.
 ## Round 14 — Ubuntu version moved into this repo (2026-11-13)
 - The Ubuntu port (GNOME Shell extension) now lives in `ubuntu/`; its own dev log is `ubuntu/NOTES.md`.
   It was briefly published as a separate repo, ernest-it/MacBar-Ubuntu.
-- Install links point at this repo: `releases/latest/download/install.sh` and
-  `macbar@ernest-it.github.io.shell-extension.zip`.
-- **Every release must carry the Ubuntu assets** (`ubuntu/dist/` zip, `install.sh`, `uninstall.sh`) next
-  to `MacBar-Setup.exe`, or the Ubuntu one-line installer breaks when that release becomes "latest".
-- Build the Ubuntu zip from `ubuntu/` with Docker (`test/pack.sh`).
+- Shipped as a .deb (`MacBar-Ubuntu.deb`, package `macbar`) instead of install.sh/uninstall.sh:
+  - Installs the extension system-wide to `/usr/share/gnome-shell/extensions/` and the schema to
+    `/usr/share/glib-2.0/schemas` (dpkg's glib trigger compiles it).
+  - `postinst` runs `/usr/libexec/macbar/macbar-setup --enable` as each signed-in user (found via
+    `/run/user/*/bus`): MacBar on, Ubuntu Dock / Dash to Dock added to `disabled-extensions`.
+  - `/etc/xdg/autostart/macbar-setup.desktop` does the same once for other users at sign-in. A marker
+    file (`~/.config/macbar/.setup-done`) stops it re-enabling MacBar after the user turns it off.
+  - `prerm` runs `--remove`: MacBar off, the docks taken back out of `disabled-extensions`.
+  - Built with `test/build-deb.sh`; `test/deb-test.sh` installs it with apt while a session bus is
+    running, checks the shell loads it (State ACTIVE) and removes it. Passed on 24.04, 25.04 and 25.10.
+- **Every release must carry `MacBar-Ubuntu.deb`** next to `MacBar-Setup.exe`, so the latest release
+  always has both.

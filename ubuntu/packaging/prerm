@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+# Turn MacBar off and Ubuntu Dock back on for whoever is signed in.
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+  for bus in /run/user/*/bus; do
+    [ -S "$bus" ] || continue
+    uid=$(basename "$(dirname "$bus")"); [ "$uid" -ge 1000 ] 2>/dev/null || continue
+    user=$(getent passwd "$uid" | cut -d: -f1); [ -n "$user" ] || continue
+    runuser -u "$user" -- env DBUS_SESSION_BUS_ADDRESS="unix:path=$bus" XDG_RUNTIME_DIR="/run/user/$uid" \
+      /usr/libexec/macbar/macbar-setup --remove || true
+  done
+  echo "MacBar is removed. Log out and back in to finish."
+fi
+exit 0

@@ -1,0 +1,37 @@
+#!/bin/bash
+# Turns MacBar on or off for the current user (run as that user, inside their session).
+#   --enable   turn MacBar on and Ubuntu Dock off
+#   --login    same as --enable, but only the first time (run at sign-in by /etc/xdg/autostart)
+#   --remove   turn MacBar off and Ubuntu Dock back on (run when the package is removed)
+UUID=macbar@ernest-it.github.io
+DOCKS="ubuntu-dock@ubuntu.com dash-to-dock@micxgx.gmail.com"
+MARK="${XDG_CONFIG_HOME:-$HOME/.config}/macbar/.setup-done"
+
+list_add() { # key uuid
+  local cur; cur=$(gsettings get org.gnome.shell "$1")
+  [[ "$cur" == *"'$2'"* ]] && return
+  if [[ "$cur" == "@as []" || "$cur" == "[]" ]]; then cur="['$2']"; else cur="${cur%]}, '$2']"; fi
+  gsettings set org.gnome.shell "$1" "$cur"
+}
+list_del() { # key uuid
+  local cur; cur=$(gsettings get org.gnome.shell "$1")
+  cur=$(echo "$cur" | sed "s/, '$2'//; s/'$2', //; s/'$2'//")
+  [[ "$cur" == "[]" ]] && cur="@as []"
+  gsettings set org.gnome.shell "$1" "$cur"
+}
+
+case "$1" in
+  --login)
+    [ -f "$MARK" ] && exit 0 ;&
+  --enable)
+    gsettings set org.gnome.shell disable-user-extensions false
+    list_del disabled-extensions $UUID
+    list_add enabled-extensions $UUID
+    for d in $DOCKS; do list_del enabled-extensions $d; list_add disabled-extensions $d; done
+    mkdir -p "$(dirname "$MARK")" && touch "$MARK" ;;
+  --remove)
+    list_del enabled-extensions $UUID
+    for d in $DOCKS; do list_del disabled-extensions $d; done
+    rm -f "$MARK" ;;
+  *) echo "usage: macbar-setup --enable | --login | --remove" >&2; exit 2 ;;
+esac

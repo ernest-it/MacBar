@@ -3,8 +3,8 @@
 A macOS-style **menu bar** and **dock** for Windows 10/11. MacBar hides the Windows taskbar
 while it runs and puts it back when you quit.
 
-On Ubuntu? See [MacBar for Ubuntu](ubuntu/) (a GNOME Shell extension). Install it with
-`curl -fsSL https://github.com/ernest-it/MacBar/releases/latest/download/install.sh | bash`.
+On Ubuntu? See [MacBar for Ubuntu](ubuntu/) (a GNOME Shell extension). Download **MacBar-Ubuntu.deb** from the
+[latest release](https://github.com/ernest-it/MacBar/releases/latest) and run `sudo apt install ./MacBar-Ubuntu.deb`.
 
 ![MacBar: menu bar and dock](docs/screenshots/overview.png)
 

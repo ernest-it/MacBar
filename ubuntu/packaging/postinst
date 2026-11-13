@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+# Turn MacBar on for whoever is signed in now; everyone else gets it at their next sign-in
+# (/etc/xdg/autostart/macbar-setup.desktop).
+if [ "$1" = "configure" ]; then
+  for bus in /run/user/*/bus; do
+    [ -S "$bus" ] || continue
+    uid=$(basename "$(dirname "$bus")"); [ "$uid" -ge 1000 ] 2>/dev/null || continue
+    user=$(getent passwd "$uid" | cut -d: -f1); [ -n "$user" ] || continue
+    runuser -u "$user" -- env DBUS_SESSION_BUS_ADDRESS="unix:path=$bus" XDG_RUNTIME_DIR="/run/user/$uid" \
+      /usr/libexec/macbar/macbar-setup --enable || true
+  done
+  echo "MacBar is installed. Log out and back in to start it."
+fi
+exit 0

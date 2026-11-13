@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=MacBar setup
+Comment=Turns MacBar on the first time you sign in after installing it
+Exec=/usr/libexec/macbar/macbar-setup --login
+OnlyShowIn=GNOME;ubuntu:GNOME;
+NoDisplay=true
+X-GNOME-Autostart-Phase=Applications

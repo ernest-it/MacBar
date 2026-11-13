@@ -56,3 +56,9 @@ other apps' windows.
 
 Not testable in the container: OpenRGB (no SDK server; the indicator correctly stays hidden), real
 Chrome profiles, a real GPU (dock blur), and multiple monitors.
+
+## Packaging (2026-11-13)
+- Moved into the main MacBar repo (`ubuntu/`) and shipped as `MacBar-Ubuntu.deb` instead of install.sh,
+  uninstall.sh and the extension zip. See Round 14 in the top-level NOTES.md for how the .deb works.
+- `test/deb-test.sh`: apt install with a live session bus, the shell loads it from /usr/share (ACTIVE),
+  the sign-in helper enables it once, then apt remove restores Ubuntu Dock. Passed on 24.04, 25.04 and 25.10.
