@@ -35,6 +35,10 @@
 .macbar-island-box { spacing: 6px; }
 .macbar-island-art { width: 18px; height: 18px; border-radius: 4px; }
 .macbar-island-title { max-width: 260px; }
+.macbar-island-artist { max-width: 160px; color: rgba(255, 255, 255, 0.6); }
+.macbar-island-controls { spacing: 0; margin-left: 2px; }
+.macbar-island-button { padding: 3px 5px; border-radius: 99px; }
+.macbar-island-button:hover { background-color: rgba(255, 255, 255, 0.18); }
 .macbar-eq { spacing: 2px; height: 14px; }
 .macbar-eq-bar { width: 3px; height: 3px; border-radius: 1px; background-color: #34c759; }
 .macbar-player { padding: 8px 12px; }

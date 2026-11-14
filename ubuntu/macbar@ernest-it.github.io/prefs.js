@@ -79,6 +79,7 @@ export default class MacBarPrefs extends ExtensionPreferences {
         const items = new Adw.PreferencesGroup({title: 'Items'});
         items.add(switchRow(s, 'show-app-name', 'Active app name'));
         items.add(switchRow(s, 'show-now-playing', 'Now Playing island', 'Album art and controls for the music that is playing'));
+        items.add(switchRow(s, 'now-playing-expanded', 'Always show music controls', 'Now Playing shows the artist and back, play/pause and skip without hovering'));
         items.add(switchRow(s, 'show-weather', 'Weather'));
         items.add(switchRow(s, 'show-sound', 'Sound menu', 'Volume, output device, microphone and microphone switch'));
         items.add(switchRow(s, 'show-lighting', 'OpenRGB lighting profiles', 'Shown while OpenRGB runs with its SDK server on'));
@@ -99,6 +100,8 @@ export default class MacBarPrefs extends ExtensionPreferences {
         dg.add(switchRow(s, 'show-dock', 'Show the dock'));
         dg.add(spinRow(s, 'dock-icon-size', 'Icon size', 24, 96, 2, 0, true));
         dg.add(spinRow(s, 'dock-magnify', 'Hover magnification', 1, 2, 0.05, 2, false));
+        dg.add(switchRow(s, 'open-from-dock', 'Windows open from the dock',
+            "New windows grow out of their app's dock icon"));
         dock.add(dg);
         dock.add(this._hidingGroup(s));
         window.add(dock);

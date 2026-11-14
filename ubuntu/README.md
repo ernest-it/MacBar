@@ -34,6 +34,8 @@ Settings: click the logo at the top left, then **MacBar Settings…**.
     Workspaces, Force Quit, Sleep, Restart, Shut Down, Lock Screen and Log Out.
   - Click the app name for New Window, Show All Windows and Quit.
 - **Now Playing island** in the middle: album art, title and a live equalizer while music plays.
+  - Hover it for the artist and previous / play-pause / next right in the bar, or keep them shown all the
+    time with Settings → Menu bar → "Always show music controls".
   - Click it for a player with large art, a seekable progress bar and previous / play-pause / next.
   - Works with Spotify, browsers and any player that supports MPRIS.
 - Right, in order: OpenRGB lighting, weather, sound, then GNOME's own quick settings and the clock.
@@ -56,6 +58,7 @@ Settings: click the logo at the top left, then **MacBar Settings…**.
 - Apps button first (opens the app grid), then pinned apps, a divider and running apps.
   Running apps get a dot.
 - Hover magnification, a bounce when an app launches, and drag to reorder.
+- New windows grow out of their dock icon, and minimized windows shrink back into it. Turn the open animation off in Settings → Dock.
   - Drag apps in from the app grid to pin them.
 - Click to launch, focus, minimize or cycle through an app's windows. Middle-click opens a new window.
 - Right-click for:

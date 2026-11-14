@@ -194,7 +194,7 @@ export class TopBar {
             if (this._indicators[role]) continue;
             switch (role) {
             case 'macbar-appname': this._add(role, new AppName(), 1, 'left'); break;
-            case 'macbar-nowplaying': this._add(role, new NowPlayingIndicator(), 0, 'center'); break;
+            case 'macbar-nowplaying': this._add(role, new NowPlayingIndicator(this._settings), 0, 'center'); break;
             // Right box, left to right: lighting, weather, sound, then GNOME's own icons.
             case 'macbar-lighting': this._add(role, new LightingIndicator(this._settings), 0, 'right'); break;
             case 'macbar-weather': this._add(role, new WeatherIndicator(this._ext, this._settings), this._indicators['macbar-lighting'] ? 1 : 0, 'right'); break;

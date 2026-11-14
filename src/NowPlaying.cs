@@ -26,9 +26,11 @@ namespace MacBar
         readonly TextBlock playPause;
         readonly DispatcherTimer poll = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
         bool busy;
+        readonly Settings settings;
 
-        public NowPlayingIsland()
+        public NowPlayingIsland(Settings settings)
         {
+            this.settings = settings;
             HorizontalAlignment = HorizontalAlignment.Center; VerticalAlignment = VerticalAlignment.Center;
             Height = 22; CornerRadius = new CornerRadius(11); Padding = new Thickness(4, 0, 12, 0);
             Background = new SolidColorBrush(Color.FromArgb(0xF0, 0x0A, 0x0A, 0x0B));
@@ -54,8 +56,8 @@ namespace MacBar
             row.Children.Add(art); row.Children.Add(title); row.Children.Add(artist); row.Children.Add(eq); row.Children.Add(controls);
             Child = row;
 
-            MouseEnter += delegate { controls.Visibility = Visibility.Visible; artist.Visibility = string.IsNullOrEmpty(artist.Text) ? Visibility.Collapsed : Visibility.Visible; };
-            MouseLeave += delegate { controls.Visibility = Visibility.Collapsed; artist.Visibility = Visibility.Collapsed; };
+            MouseEnter += delegate { SyncExpanded(); };
+            MouseLeave += delegate { SyncExpanded(); };
             artist.Visibility = Visibility.Collapsed;
             MouseLeftButtonUp += delegate (object s, MouseButtonEventArgs e)
             {
@@ -66,6 +68,14 @@ namespace MacBar
             poll.Tick += delegate { Refresh(); };
             poll.Start();
             Refresh();
+        }
+
+        /// <summary>Artist and controls show on hover, or all the time when the user turned that on.</summary>
+        public void SyncExpanded()
+        {
+            bool open = IsMouseOver || (settings != null && settings.NowPlayingExpanded);
+            controls.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+            artist.Visibility = open && !string.IsNullOrEmpty(artist.Text) ? Visibility.Visible : Visibility.Collapsed;
         }
 
         Border Button(string glyph, int cmd)
@@ -98,6 +108,7 @@ namespace MacBar
                 if (!changed) return;
                 title.Text = np.Title;
                 artist.Text = np.Artist ?? "";
+                SyncExpanded();
                 art.Background = np.Art != null ? (Brush)new ImageBrush(np.Art) { Stretch = Stretch.UniformToFill } : new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x3C));
                 playPause.Text = np.Playing ? "" : "";
                 Animate(np.Playing);

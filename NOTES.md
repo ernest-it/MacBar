@@ -467,3 +467,35 @@ caption, so they don't trigger it.
   (after `startup-complete` at sign-in: Ubuntu Dock throws if it's disabled before its startup animation)
   and back on in `disable()` unless the screen is just locking. `macbar-setup --enable` only enables
   MacBar. `test/deb-test.sh` now installs the real Ubuntu Dock and checks the hand-off both ways.
+
+## Round 16 — Ubuntu: windows open from / minimize to the dock (2026-11-13)
+- Minimize/unminimize flew to the top-left corner: GNOME animates toward the window's *icon geometry*,
+  which Ubuntu Dock sets and MacBar's dock didn't. The dock now calls `set_icon_geometry()` (Mtk.Rectangle)
+  for every window of every dock app, using the icon's resting position (ignoring auto-hide translation and
+  magnification). Re-synced on allocation changes, show/hide, window-created and **map** (GNOME 49 maps a
+  window ~1 s after creating it, and geometry set before that didn't stick).
+- New windows grow out of their app's dock icon (or the middle of the dock if the app has no icon yet):
+  on `global.window_manager` 'map' (connected after GNOME's own handler) we `remove_all_transitions()`,
+  which makes GNOME's onStopped run `_mapWindowDone` (resets the actor and completes the map), then ease
+  translation/scale from the icon (320 ms, EASE_OUT_EXPO) with a quick fade-in. Skipped for non-normal,
+  transient, full-screen and non-primary-monitor windows, in the overview, and when animations are off.
+  Setting: Dock → "Windows open from the dock" (`open-from-dock`, default on).
+- Test gotcha: GNOME inhibits animations on software rendering (`St.Settings.enable_animations` is false
+  in the Docker shell), so the self-test uninhibits them around the launch check.
+- Self-test now 29 checks (open-from-dock, open animation settles, minimize goes to the dock icon); passes
+  on 24.04 and 25.10.
+
+## Round 17: music controls always shown (Windows + Ubuntu)
+
+- New setting "Always show music controls" (Menu bar → Items): the Now Playing island keeps the artist and
+  back / play-pause / skip visible instead of only on hover. Windows: `Settings.NowPlayingExpanded`;
+  `NowPlayingIsland.SyncExpanded()` (hover OR setting) runs on enter/leave, on track change and from
+  `TopBar.Rebuild()` after settings are applied. Ubuntu: `now-playing-expanded` key.
+- Ubuntu's island had no inline controls at all before (only the click-open player): added an artist
+  label and three small St.Buttons, shown on hover / while the player is open / with the setting.
+- GNOME 49 gotcha: a press on an St.Button inside a PanelMenu.Button still reaches the panel button's
+  `vfunc_event`, which toggles the menu (and its grab cancels the button's click). The island overrides
+  `vfunc_event` and skips the toggle when the press lands inside its controls (`stage.get_event_actor`).
+- Test: `test/fake-player.js` is a gjs MPRIS player run by run.sh; the self-test checks the island shows
+  the track, hides controls until hover, shows them with the setting, that clicking skip in the bar
+  changes the track without opening the player, and that they hide again. 35/35 on 24.04 and 25.10.

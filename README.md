@@ -58,7 +58,8 @@ On Ubuntu? See [MacBar for Ubuntu](ubuntu/) (a GNOME Shell extension). Download 
   Do Not Disturb and Screen Mirroring tiles, display brightness (laptops and DDC/CI monitors),
   volume, and Now Playing
 - **Now Playing island** in the middle of the menu bar: album art, title and live equalizer while
-  music plays; hover for controls, click for a big player with blurred album-art background and a
+  music plays; hover for the artist and controls (or keep them shown: Settings → Always show music
+  controls), click for a big player with blurred album-art background and a
   seekable progress bar (works with Spotify, browsers and any app using Windows media controls)
 - **Calendar** panel: today's date, month calendar, shortcuts to notifications and Do Not Disturb
 - **Lighting** (palette icon): your [OpenRGB](https://openrgb.org) profiles, one click to switch. Shown

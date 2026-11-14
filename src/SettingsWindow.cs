@@ -304,6 +304,7 @@ namespace MacBar
             var items = Group("Items");
             Toggle(items, "Background app icons", "Tray icons from apps running in the background", s.ShowTrayIcons, v => { s.ShowTrayIcons = v; BuildShell(); });
             Toggle(items, "Battery percentage", "Shown on laptops", s.ShowBatteryPercent, v => s.ShowBatteryPercent = v);
+            Toggle(items, "Always show music controls", "Now Playing shows the artist and back, play/pause and skip without hovering", s.NowPlayingExpanded, v => s.NowPlayingExpanded = v);
             Toggle(items, "OpenRGB lighting profiles", "Shown while OpenRGB runs with its SDK server on", s.ShowLighting, v => { s.ShowLighting = v; if (v) OpenRgb.Refresh(Dispatcher); });
 
             var behave = Group("Behavior");

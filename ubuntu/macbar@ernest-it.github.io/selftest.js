@@ -4,6 +4,7 @@ import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
+import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 const sleep = ms => new Promise(r => GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => { r(); return GLib.SOURCE_REMOVE; }));
@@ -91,10 +92,34 @@ export class SelfTest {
         // Launch two apps from the dock's point of view.
         const appSys = Shell.AppSystem.get_default();
         const editorId = 'org.gnome.TextEditor.desktop', calcId = 'org.gnome.Calculator.desktop';
+        // GNOME turns animations off on software rendering (like this test machine); turn them on for this check.
+        const sts = St.Settings.get();
+        const wasOff = !sts.enable_animations;
+        if (wasOff) sts.uninhibit_animations();
+        // Record each new window part-way through its open animation (it should start small, near the dock).
+        const opened = [];
+        const mapId = global.window_manager.connect('map', (wm, actor) => {
+            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 40, () => {
+                const [, dy] = this._ext.dock.box.get_transformed_position();
+                opened.push({title: actor.meta_window?.get_title(), sx: actor.scale_x, ty: actor.translation_y,
+                    centerY: actor.y + actor.height / 2 + actor.translation_y, dockY: dy});
+                return GLib.SOURCE_REMOVE;
+            });
+        });
         appSys.lookup_app(editorId)?.activate();
         appSys.lookup_app(calcId)?.activate();
         const launched = await this._waitFor(() => this._windowsOf(editorId).length && this._windowsOf(calcId).length, 20000);
         this._check('apps launched', launched);
+        await this._waitFor(() => opened.length >= 2, 5000);
+        await sleep(600);
+        global.window_manager.disconnect(mapId);
+        if (wasOff) sts.inhibit_animations();
+        const grow = opened.filter(o => o.sx < 0.9 && o.ty > 0);
+        this._check('windows open from the dock', opened.length > 0 && grow.length === opened.length, JSON.stringify(opened));
+        const settled = global.get_window_actors().filter(a => a.meta_window.get_window_type() === 0).every(a => a.scale_x === 1 && a.translation_y === 0 && a.opacity === 255);
+        this._check('open animation settles', settled);
+        const ig = this._windowsOf(calcId)[0]?.get_icon_geometry?.();
+        this._check('minimize goes to the dock icon', !!ig && ig[0] && ig[1].y > global.screen_height - 150, ig ? JSON.stringify([ig[1].x, ig[1].y, ig[1].width, ig[1].height]) : 'none');
         await sleep(1500);
         this._check('running apps in dock', dock._items.some(i => i.app && i.app.get_id() === calcId), dock._items.map(i => i.app?.get_id()).join(','));
 
@@ -196,6 +221,42 @@ export class SelfTest {
         await sleep(1200);
         edWin.unmake_fullscreen();
         await sleep(800);
+
+        // Now Playing island, fed by test/fake-player.js.
+        const np = Main.panel.statusArea['macbar-nowplaying'];
+        const npSt = this._ext.getSettings();
+        await this._waitFor(() => np?.visible && np._title.text, 8000);
+        this._check('now playing shows the track', np?.visible && np._title.text === 'First Song', np?._title.text);
+        if (np?.visible) {
+            this._warp(mon.x + 200, mon.y + 600);
+            await sleep(400);
+            this._check('music controls hidden until hover', !np._controls.visible && !np._artist.visible);
+            await this._shot('11-nowplaying');
+            npSt.set_boolean('now-playing-expanded', true);
+            await sleep(500);
+            this._check('music controls always shown with the setting', np._controls.visible && np._artist.visible, np._artist.text);
+            await this._shot('11b-nowplaying-expanded');
+            const next = np._controls.get_child_at_index(2);
+            const [bx, by] = next.get_transformed_position();
+            const [bw, bh] = next.get_transformed_size();
+            const dev = Clutter.get_default_backend().get_default_seat().create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
+            const t = () => GLib.get_monotonic_time();
+            this._warp(bx + bw / 2, by + bh / 2);
+            await sleep(300);
+            dev.notify_absolute_motion(t(), bx + bw / 2, by + bh / 2);
+            await sleep(200);
+            dev.notify_button(t(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.PRESSED);
+            await sleep(60);
+            dev.notify_button(t(), Clutter.BUTTON_PRIMARY, Clutter.ButtonState.RELEASED);
+            await this._waitFor(() => np._title.text === 'Second Song', 3000);
+            this._check('skip button in the bar works', np._title.text === 'Second Song', np._title.text);
+            this._check('skip button does not open the player', !np.menu.isOpen);
+            np.menu.close();
+            this._warp(mon.x + 200, mon.y + 600);
+            npSt.set_boolean('now-playing-expanded', false);
+            await sleep(400);
+            this._check('music controls hide again when the setting is off', !np._controls.visible);
+        }
 
         // Preferences window.
         GLib.spawn_command_line_async(`gnome-extensions prefs ${this._ext.uuid}`);

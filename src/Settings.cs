@@ -26,6 +26,7 @@ namespace MacBar
         public bool MenuBarReservesSpace { get; set; } // maximized windows stop below the menu bar
         public bool ShowTrayIcons { get; set; }
         public bool ShowBatteryPercent { get; set; }
+        public bool NowPlayingExpanded { get; set; }   // Now Playing island always shows the artist and controls (not just on hover)
         public bool HasLocation { get; set; }
         public string WeatherLocation { get; set; }
         public double Latitude { get; set; }

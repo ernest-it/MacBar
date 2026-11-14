@@ -107,24 +107,43 @@ async function localArt(url) {
 
 export const NowPlayingIndicator = GObject.registerClass(
 class NowPlayingIndicator extends PanelMenu.Button {
-    _init() {
+    _init(settings) {
         super._init(0.5, 'MacBar Now Playing', false);
+        this._settings = settings;
         this.add_style_class_name('macbar-island');
         const box = new St.BoxLayout({style_class: 'macbar-island-box'});
         this._art = new St.Bin({style_class: 'macbar-island-art', y_align: Clutter.ActorAlign.CENTER});
         this._title = new St.Label({style_class: 'macbar-island-title', y_align: Clutter.ActorAlign.CENTER});
         this._title.clutter_text.ellipsize = 3; // END
+        this._artist = new St.Label({style_class: 'macbar-island-artist', y_align: Clutter.ActorAlign.CENTER, visible: false});
+        this._artist.clutter_text.ellipsize = 3;
         this._eq = new St.BoxLayout({style_class: 'macbar-eq', y_align: Clutter.ActorAlign.CENTER});
         this._bars = [0, 1, 2, 3].map(() => {
             const b = new St.Widget({style_class: 'macbar-eq-bar', y_align: Clutter.ActorAlign.END});
             this._eq.add_child(b);
             return b;
         });
+        // Back / play-pause / skip right in the bar: shown on hover, or all the time (a setting).
+        this._controls = new St.BoxLayout({style_class: 'macbar-island-controls', y_align: Clutter.ActorAlign.CENTER, visible: false});
+        const ctl = (iconName, method) => {
+            const ic = new St.Icon({icon_name: iconName, icon_size: 12});
+            const b = new St.Button({style_class: 'macbar-island-button', child: ic, can_focus: false, y_align: Clutter.ActorAlign.CENTER});
+            b.connect('clicked', () => this._current?.call(method));
+            this._controls.add_child(b);
+            return ic;
+        };
+        ctl('media-skip-backward-symbolic', 'Previous');
+        this._barPlayIcon = ctl('media-playback-start-symbolic', 'PlayPause');
+        ctl('media-skip-forward-symbolic', 'Next');
         box.add_child(this._art);
         box.add_child(this._title);
+        box.add_child(this._artist);
         box.add_child(this._eq);
+        box.add_child(this._controls);
         this.add_child(box);
         this.visible = false;
+        this.connect('notify::hover', () => this._syncExpanded());
+        this._expandedId = settings?.connect('changed::now-playing-expanded', () => this._syncExpanded());
 
         this._players = new Map();
         this._buildMenu();
@@ -136,6 +155,7 @@ class NowPlayingIndicator extends PanelMenu.Button {
             } else {
                 this._posTimer = removeSource(this._posTimer);
             }
+            this._syncExpanded();
         });
     }
 
@@ -184,8 +204,11 @@ class NowPlayingIndicator extends PanelMenu.Button {
         if (!p) { this._eqStop(); return; }
         const playing = p.status === 'Playing';
         this._title.text = p.title;
+        this._artist.text = p.artist;
+        this._barPlayIcon.icon_name = playing ? 'media-playback-pause-symbolic' : 'media-playback-start-symbolic';
         if (playing) this._eqStart(); else this._eqStop();
         this._eq.visible = playing;
+        this._syncExpanded();
 
         this._mTitle.text = p.title;
         this._mArtist.text = p.artist;
@@ -217,6 +240,32 @@ class NowPlayingIndicator extends PanelMenu.Button {
         this._settingSlider = false;
         this._elapsed.text = fmt(pos);
         this._total.text = len > 0 ? fmt(len) : '';
+    }
+
+    // On newer GNOME a press on a button inside the island still reaches the island and would open the
+    // player, so presses on the bar's own controls are left to the buttons.
+    vfunc_event(event) {
+        const type = event.type();
+        if (this._controls.visible && (type === Clutter.EventType.BUTTON_PRESS || type === Clutter.EventType.TOUCH_BEGIN)) {
+            let target = global.stage.get_event_actor?.(event);
+            if (!target) {
+                const [x, y] = event.get_coords();
+                target = global.stage.get_actor_at_pos(Clutter.PickMode.REACTIVE, x, y);
+            }
+            if (target && this._controls.contains(target)) return Clutter.EVENT_PROPAGATE;
+        }
+        return super.vfunc_event(event);
+    }
+
+    get expanded() {
+        return this.hover || this.menu.isOpen || !!this._settings?.get_boolean('now-playing-expanded');
+    }
+
+    _syncExpanded() {
+        if (this._destroyed) return;
+        const open = this.expanded;
+        this._controls.visible = open;
+        this._artist.visible = open && !!this._artist.text;
     }
 
     _eqStart() {
@@ -276,6 +325,7 @@ class NowPlayingIndicator extends PanelMenu.Button {
 
     destroy() {
         this._destroyed = true;
+        if (this._expandedId) this._settings.disconnect(this._expandedId);
         this._eqStop();
         this._posTimer = removeSource(this._posTimer);
         if (this._nameSub) Gio.DBus.session.signal_unsubscribe(this._nameSub);

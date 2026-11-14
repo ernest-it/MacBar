@@ -116,6 +116,7 @@ namespace MacBar
         string datePattern = "ddd MMM d", timePattern = "h:mm tt";
         WinEventProc fgProc; IntPtr fgHook;
         bool suppressNextUp;
+        NowPlayingIsland island;
 
         public TopBar(Settings s, TrayHost tray, WeatherService weather) : base(s)
         {
@@ -124,7 +125,8 @@ namespace MacBar
             // The Now Playing island floats in the (otherwise empty) center of the bar.
             var layers = new Grid();
             layers.Children.Add(root);
-            layers.Children.Add(new NowPlayingIsland());
+            island = new NowPlayingIsland(s);
+            layers.Children.Add(island);
             Bar.Child = layers;
             DockPanel.SetDock(right, Dock.Right);
             root.Children.Add(right);
@@ -301,6 +303,7 @@ namespace MacBar
         {
             Build();
             ApplyAppearance();
+            island.SyncExpanded();
             OnForeground(IntPtr.Zero, 3, Native.GetForegroundWindow(), 0, 0, 0, 0);
         }
 

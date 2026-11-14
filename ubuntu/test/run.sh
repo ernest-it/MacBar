@@ -22,6 +22,7 @@ dbus-run-session -- bash -c "
   pactl set-default-source mic
   gnome-shell --headless --wayland --virtual-monitor 1920x1080 --no-x11 > /out/shell.log 2>&1 &
   SHELL_PID=\$!
+  (sleep 8; gjs -m /src/test/fake-player.js > /out/player.log 2>&1) &
   for i in \$(seq 1 240); do [ -f /out/done ] && break; sleep 1; done
   sleep 1
   kill \$SHELL_PID 2>/dev/null; sleep 1

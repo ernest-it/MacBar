@@ -5,6 +5,7 @@ import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
+import Mtk from 'gi://Mtk';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -213,6 +214,12 @@ export class Dock {
             [Main.overview, Main.overview.connect('hidden', () => this._tick())],
             [this.box, this.box.connect('notify::width', () => this._reposition())],
             [this.box, this.box.connect('notify::height', () => this._reposition())],
+            // Minimize/restore animations fly to the window's dock icon (GNOME reads the icon geometry).
+            [this.box, this.box.connect('notify::allocation', () => this._queueIconGeometry())],
+            [global.display, global.display.connect('window-created', () => this._queueIconGeometry())],
+            // New windows grow out of their dock icon.
+            // (Also set the icon geometry when a window appears: newer GNOME maps windows well after creating them.)
+            [global.window_manager, global.window_manager.connect('map', (wm, actor) => { this._animateOpen(actor); this._queueIconGeometry(); })],
         ];
         this._settingIds = [
             this._settings.connect('changed::dock-icon-size', () => this._rebuild()),
@@ -270,6 +277,75 @@ export class Dock {
                 this.box.add_effect_with_name('macbar-blur', this._blur);
             } catch (e) { this._blur = null; }
         }
+    }
+
+    // ----- window animations -----
+
+    _itemFor(app) {
+        if (!app) return null;
+        const id = app.get_id();
+        return this._items.find(it => it.app && it.app.get_id() === id) ?? null;
+    }
+
+    /** Where an item sits on screen when the dock is shown (ignores auto-hide and magnification). */
+    _restingRect(item) {
+        const [x, y] = item.get_transformed_position();
+        const [w, h] = item.get_transformed_size();
+        const sx = item.iconActor?.scale_x || 1;
+        return {x: Math.round(x), y: Math.round(y - this.box.translation_y), width: Math.round(w / sx) || 1, height: Math.round(h) || 1};
+    }
+
+    _queueIconGeometry() {
+        if (this._geomId) return;
+        this._geomId = GLib.idle_add(GLib.PRIORITY_LOW, () => {
+            this._geomId = 0;
+            this._syncIconGeometry();
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _syncIconGeometry() {
+        for (const it of this._items) {
+            if (!it.app || !it.mapped) continue;
+            const r = this._restingRect(it);
+            const rect = new Mtk.Rectangle({x: r.x, y: r.y, width: r.width, height: r.height});
+            for (const w of it.app.get_windows()) w.set_icon_geometry(rect);
+        }
+    }
+
+    _animateOpen(actor) {
+        if (!this._settings.get_boolean('open-from-dock') || !this.container.visible || Main.overview.visible) return;
+        if (!St.Settings.get().enable_animations) return;
+        const win = actor.meta_window;
+        if (!win || win.get_window_type() !== Meta.WindowType.NORMAL || win.is_fullscreen() || win.get_transient_for()) return;
+        if (win.get_monitor() !== Main.layoutManager.primaryIndex) return;
+        // Start from the app's icon, or the middle of the dock if it has none yet.
+        const item = this._itemFor(Shell.WindowTracker.get_default().get_window_app(win));
+        let cx, cy, iw, ih;
+        if (item && item.mapped) {
+            const r = this._restingRect(item);
+            cx = r.x + r.width / 2; cy = r.y + r.height / 2; iw = r.width; ih = r.height;
+        } else {
+            const [bx, by] = this.box.get_transformed_position();
+            cx = bx + this.box.width / 2; cy = by - this.box.translation_y + this.box.height / 2;
+            iw = ih = this.iconSize;
+        }
+        if (actor.width < 2 || actor.height < 2) return;
+        // GNOME has started its own map animation; stopping it completes the map, then ours plays on top.
+        actor.remove_all_transitions();
+        actor.set_pivot_point(0.5, 0.5);
+        actor.translation_x = cx - (actor.x + actor.width / 2);
+        actor.translation_y = cy - (actor.y + actor.height / 2);
+        actor.scale_x = Math.max(0.04, iw / actor.width);
+        actor.scale_y = Math.max(0.04, ih / actor.height);
+        actor.opacity = 0;
+        actor.show();
+        actor.ease({opacity: 255, duration: 120, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+        actor.ease({
+            translation_x: 0, translation_y: 0, scale_x: 1, scale_y: 1,
+            duration: 320, mode: Clutter.AnimationMode.EASE_OUT_EXPO,
+            onStopped: () => { actor.set_pivot_point(0, 0); actor.translation_x = 0; actor.translation_y = 0; actor.scale_x = 1; actor.scale_y = 1; actor.opacity = 255; },
+        });
     }
 
     _queueRebuild() {
@@ -417,6 +493,7 @@ export class Dock {
 
     _setShown(shown, now = false) {
         if (shown === this._shown && !now) return;
+        this._queueIconGeometry();
         this._shown = shown;
         const h = this.box.height + GAP + 4;
         this.box.ease({
@@ -428,6 +505,7 @@ export class Dock {
     destroy() {
         this._timer = removeSource(this._timer);
         if (this._rebuildId) { GLib.source_remove(this._rebuildId); this._rebuildId = 0; }
+        if (this._geomId) { GLib.source_remove(this._geomId); this._geomId = 0; }
         this.closeMenus();
         for (const [obj, id] of this._signals) obj.disconnect(id);
         this._settingIds.forEach(id => this._settings.disconnect(id));

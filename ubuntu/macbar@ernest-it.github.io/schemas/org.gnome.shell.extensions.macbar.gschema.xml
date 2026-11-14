@@ -6,6 +6,7 @@
     <key name="blur" type="s"><default>'light'</default><summary>Blur behind the dock: none, light, strong</summary></key>
     <key name="show-app-name" type="b"><default>true</default><summary>Show the active app name</summary></key>
     <key name="show-now-playing" type="b"><default>true</default><summary>Show the Now Playing island</summary></key>
+    <key name="now-playing-expanded" type="b"><default>false</default><summary>Always show the artist and music controls in the Now Playing island</summary></key>
     <key name="show-weather" type="b"><default>true</default><summary>Show the weather</summary></key>
     <key name="show-sound" type="b"><default>true</default><summary>Show the sound menu</summary></key>
     <key name="show-lighting" type="b"><default>true</default><summary>Show OpenRGB lighting profiles</summary></key>
@@ -17,6 +18,7 @@
     <key name="dock-autohide" type="s"><default>'never'</default><summary>never, always, intellihide</summary></key>
     <key name="dock-icon-size" type="i"><range min="24" max="96"/><default>48</default><summary>Dock icon size</summary></key>
     <key name="dock-magnify" type="d"><default>1.4</default><summary>Hover magnification (1 = off)</summary></key>
+    <key name="open-from-dock" type="b"><default>true</default><summary>New windows grow out of their dock icon</summary></key>
     <!-- Weather -->
     <key name="weather-city" type="s"><default>''</default><summary>Weather city name</summary></key>
     <key name="weather-lat" type="d"><default>40.7128</default></key>
