@@ -9,8 +9,8 @@ using Microsoft.Win32;
 [assembly: System.Reflection.AssemblyTitle("MacBar")]
 [assembly: System.Reflection.AssemblyProduct("MacBar")]
 [assembly: System.Reflection.AssemblyDescription("macOS-style menu bar and dock for Windows")]
-[assembly: System.Reflection.AssemblyVersion("1.4.3.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.4.3.0")]
+[assembly: System.Reflection.AssemblyVersion("1.4.4.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.4.4.0")]
 
 namespace MacBar
 {
@@ -142,6 +142,7 @@ namespace MacBar
         void EnsureWorkArea()
         {
             if (top == null || dock == null || cleanedUp) return;
+            if (TaskbarHider.Revealing) return; // the real taskbar is up for a UAC prompt and reserves its own space
             int sw = Native.GetSystemMetrics(0), sh = Native.GetSystemMetrics(1);
             var want = new RECT { Left = 0, Top = top.ReservedPx, Right = sw, Bottom = sh - dock.ReservedPx };
             var cur = new RECT();

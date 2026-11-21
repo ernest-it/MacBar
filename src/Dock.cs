@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Shapes;
@@ -16,6 +17,8 @@ namespace MacBar
         public PinnedApp Pin;
         public string Aumid, ExePath, Name, LaunchTarget;
         public bool IsUwp;
+        /// <summary>Holds UAC (admin rights) prompts; can't be launched or pinned.</summary>
+        public bool IsUac;
         public readonly List<AppWindow> Windows = new List<AppWindow>();
         public FrameworkElement View;
         public Ellipse Dot;
@@ -46,6 +49,10 @@ namespace MacBar
         readonly List<IntPtr> hooks = new List<IntPtr>();
         WinEventProc hookProc;
         IntPtr lastForeground;
+        // Shell hook (the messages Explorer's taskbar gets): windows flashing for attention until activated.
+        int shellHookMsg;
+        readonly HashSet<IntPtr> attention = new HashSet<IntPtr>();
+        DateTime showUntil;
         const int GapDip = 4;
 
         // drag-to-reorder state
@@ -70,13 +77,22 @@ namespace MacBar
                 // show/hide/destroy, name change, cloak/uncloak, foreground, minimize start/end
                 uint[][] ranges = { new uint[] { 0x8001, 0x8003 }, new uint[] { 0x800C, 0x800C }, new uint[] { 0x8017, 0x8018 }, new uint[] { 3, 3 }, new uint[] { 0x16, 0x17 } };
                 foreach (var r in ranges) hooks.Add(Native.SetWinEventHook(r[0], r[1], IntPtr.Zero, hookProc, 0, 0, 2));
+                shellHookMsg = Native.RegisterWindowMessage("SHELLHOOK");
+                if (Native.RegisterShellHookWindow(Hwnd)) HwndSource.FromHwnd(Hwnd).AddHook(ShellHook);
+                else App.Trace("RegisterShellHookWindow failed");
             };
-            Closed += delegate { foreach (var h in hooks) Native.UnhookWinEvent(h); };
+            Closed += delegate
+            {
+                foreach (var h in hooks) Native.UnhookWinEvent(h);
+                Native.DeregisterShellHookWindow(Hwnd);
+                TaskbarHider.RevealChanged -= OnTaskbarReveal;
+            };
+            TaskbarHider.RevealChanged += OnTaskbarReveal;
             SizeChanged += delegate { Reposition(); };
             Loaded += delegate { RebuildPinned(); Refresh(); };
 
             var poll = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
-            poll.Tick += delegate { Refresh(); };
+            poll.Tick += delegate { Refresh(); BounceWaiting(); };
             poll.Start();
 
             var autoHide = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(16) };
@@ -90,6 +106,80 @@ namespace MacBar
             if (evt == 3 && hwnd != IntPtr.Zero && Native.GetPid(hwnd) != (uint)System.Diagnostics.Process.GetCurrentProcess().Id)
                 lastForeground = hwnd;
             debounce.Stop(); debounce.Start();
+        }
+
+        // ---------- attention (flashing windows, held-back UAC prompts) ----------
+
+        IntPtr ShellHook(IntPtr h, int msg, IntPtr w, IntPtr l, ref bool handled)
+        {
+            if (shellHookMsg == 0 || msg != shellHookMsg) return IntPtr.Zero;
+            int code = w.ToInt32();
+            if (code == (Native.HSHELL_REDRAW | Native.HSHELL_HIGHBIT)) OnFlash(l); // HSHELL_FLASH
+            else if ((code & ~Native.HSHELL_HIGHBIT) == Native.HSHELL_WINDOWACTIVATED) attention.Remove(l);
+            else if (code == Native.HSHELL_WINDOWCREATED && WindowTracker.IsUacPrompt(l))
+                Dispatcher.BeginInvoke(new Action(delegate { OnFlash(l); }), DispatcherPriority.Background);
+            return IntPtr.Zero;
+        }
+
+        /// <summary>A window wants attention: list it even if it normally wouldn't be, bounce its icon and show the dock.</summary>
+        void OnFlash(IntPtr hwnd)
+        {
+            if (hwnd == IntPtr.Zero || Native.GetForegroundWindow() == hwnd) return;
+            bool isNew = attention.Add(hwnd);
+            Refresh();
+            var item = ItemFor(hwnd);
+            App.Trace(string.Format("attention {0} class '{1}' -> {2}", hwnd, Native.GetClass(hwnd), item != null ? item.Name : "(not in dock)"));
+            if (item == null || !isNew) return;
+            showUntil = DateTime.Now.AddSeconds(3);
+            BounceOnce(item);
+        }
+
+        DockItem ItemFor(IntPtr hwnd)
+        {
+            return pinned.Concat(running).FirstOrDefault(i => i.Windows.Exists(w => w.Hwnd == hwnd));
+        }
+
+        /// <summary>Every few seconds, bounce apps still waiting (like a macOS app that needs you).</summary>
+        void BounceWaiting()
+        {
+            IntPtr fg = Native.GetForegroundWindow();
+            if (fg == IntPtr.Zero) return; // the secure desktop is up: the prompt is open
+            foreach (var i in pinned.Concat(running))
+                if (i.Windows.Exists(w => w.Hwnd != fg && (w.IsUac || attention.Contains(w.Hwnd)))) BounceOnce(i);
+        }
+
+        /// <summary>Opens a window that wants attention. A held-back UAC prompt gets the real taskbar as a fallback.</summary>
+        void OpenWaiting(AppWindow w)
+        {
+            attention.Remove(w.Hwnd);
+            bool ok = WindowTracker.Activate(w.Hwnd);
+            App.Trace(string.Format("dock opened waiting window {0} uac={1} foreground={2}", w.Hwnd, w.IsUac, ok));
+            if (!w.IsUac) return;
+            IntPtr h = w.Hwnd;
+            var check = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
+            check.Tick += delegate
+            {
+                check.Stop();
+                // The prompt opened if its button went away, the secure desktop took over (no foreground
+                // window here), or the prompt dialog itself is in front. The button window being in front
+                // doesn't count: activating it doesn't always open the prompt. Then only the real taskbar
+                // button does, so show the taskbar until the prompt is answered.
+                IntPtr fg = Native.GetForegroundWindow();
+                bool opened = !Native.IsWindow(h) || !Native.IsWindowVisible(h) || fg == IntPtr.Zero ||
+                    (fg != h && WindowTracker.IsUacPrompt(fg) && Native.GetClass(fg) != WindowTracker.UacButtonClass);
+                App.Trace(string.Format("uac check: opened={0} fg={1} class '{2}'", opened, fg, fg != IntPtr.Zero ? Native.GetClass(fg) : ""));
+                if (opened) return;
+                TaskbarHider.Reveal(delegate { return !Native.IsWindow(h) || !Native.IsWindowVisible(h); });
+            };
+            check.Start();
+        }
+
+        /// <summary>The real taskbar sits where the dock is, so the dock steps aside while it's shown.</summary>
+        void OnTaskbarReveal(bool shown)
+        {
+            if (Hwnd == IntPtr.Zero) return;
+            Native.ShowWindow(Hwnd, shown ? Native.SW_HIDE : Native.SW_SHOWNA);
+            if (!shown) { Refresh(); Reposition(); }
         }
 
         public override void ApplyAppearance()
@@ -171,7 +261,7 @@ namespace MacBar
                 int sw = Native.GetSystemMetrics(0), sh = Native.GetSystemMetrics(1);
                 bool atEdge = p.Y >= sh - 2 && p.Y < sh + 2 && p.X >= 0 && p.X < sw;
                 bool overDock = progress < 0.6 && p.X >= baseX - 12 && p.X <= baseX + pxW + 12 && p.Y >= baseY + pxHead - 16 && p.Y < sh + 2;
-                bool busy = menuOpen || dragging || pressed != null || HoldShown;
+                bool busy = menuOpen || dragging || pressed != null || HoldShown || DateTime.Now < showUntil;
                 bool wantShown = atEdge || overDock || busy;
                 if (mode == 2 && !wantShown) wantShown = !OverlapsFocusedWindow();
                 if (wantShown) lastWanted = DateTime.Now;
@@ -258,14 +348,21 @@ namespace MacBar
         public void Refresh()
         {
             if (dragging) return;
-            var wins = WindowTracker.GetAppWindows();
+            attention.RemoveWhere(h => !Native.IsWindow(h));
+            var wins = WindowTracker.GetAppWindows(attention);
             if (Demo.On) wins.Clear(); // no real running apps in screenshots
             foreach (var i in pinned) i.Windows.Clear();
             foreach (var i in running) i.Windows.Clear();
             foreach (var w in wins)
             {
                 var item = pinned.FirstOrDefault(p => p.Matches(w)) ?? running.FirstOrDefault(r => r.Matches(w));
-                if (item == null)
+                if (item == null && w.IsUac)
+                {
+                    item = new DockItem { ExePath = w.ExePath, IsUac = true, Name = "User Account Control" };
+                    BuildView(item, IconLoader.UacShield(IconPx()));
+                    running.Add(item);
+                }
+                else if (item == null)
                 {
                     item = new DockItem { Aumid = w.Aumid, ExePath = w.ExePath, IsUwp = w.IsUwp };
                     bool useAumid = w.IsUwp && !string.IsNullOrEmpty(w.Aumid);
@@ -438,6 +535,9 @@ namespace MacBar
         void OnClick(DockItem item)
         {
             if (item.Windows.Count == 0) { Launch(item); return; }
+            // A window waiting for an answer (an admin prompt, a flashing app) is what the click is for.
+            var waiting = item.Windows.FirstOrDefault(w => w.IsUac || attention.Contains(w.Hwnd));
+            if (waiting != null) { OpenWaiting(waiting); return; }
             IntPtr fg = Native.GetForegroundWindow();
             if (fg == IntPtr.Zero) fg = lastForeground;
             int idx = item.Windows.FindIndex(w => w.Hwnd == fg);
@@ -467,7 +567,19 @@ namespace MacBar
                 var win = w;
                 string t = string.IsNullOrEmpty(w.Title) ? item.Name : w.Title;
                 if (t.Length > 60) t = t.Substring(0, 57) + "…";
-                m.Items.Add(Mi(t, delegate { WindowTracker.Activate(win.Hwnd); }));
+                m.Items.Add(Mi(t, delegate { if (item.IsUac || attention.Contains(win.Hwnd)) OpenWaiting(win); else WindowTracker.Activate(win.Hwnd); }));
+            }
+            if (item.IsUac)
+            {
+                // Nothing to pin or launch; offer the real taskbar in case the prompt won't open from here.
+                m.Items.Add(new Separator());
+                m.Items.Add(Mi("Show Windows Taskbar", delegate
+                {
+                    var hs = item.Windows.Select(x => x.Hwnd).ToList();
+                    TaskbarHider.Reveal(delegate { return !hs.Exists(x => Native.IsWindow(x) && Native.IsWindowVisible(x)); });
+                }));
+                m.IsOpen = true;
+                return;
             }
             if (item.Windows.Count > 0) m.Items.Add(new Separator());
             if (item.Pin != null)

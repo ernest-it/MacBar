@@ -14,6 +14,8 @@ namespace MacBar
     public class AppWindow
     {
         public IntPtr Hwnd; public uint Pid; public string ExePath; public string Aumid; public string Title; public bool IsUwp;
+        /// <summary>A UAC (admin rights) prompt from consent.exe, e.g. one Windows held back as a taskbar button.</summary>
+        public bool IsUac;
     }
 
     public static class WindowTracker
@@ -21,12 +23,26 @@ namespace MacBar
         static readonly uint myPid = (uint)Process.GetCurrentProcess().Id;
         static readonly Dictionary<uint, string> pathCache = new Dictionary<uint, string>();
 
-        public static List<AppWindow> GetAppWindows()
+        /// <summary>
+        /// Window class of the taskbar button Windows shows instead of a UAC prompt when the app asking for
+        /// admin rights isn't in the foreground. Clicking that button opens the prompt.
+        /// </summary>
+        public const string UacButtonClass = "$$$Secure UAP Dummy Window Class For Interim Dialog";
+
+        public static bool IsUacPrompt(IntPtr h)
+        {
+            if (Native.GetClass(h) == UacButtonClass) return true;
+            string p = ProcPath(Native.GetPid(h));
+            return p != null && p.EndsWith("\\consent.exe", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <param name="include">Windows to list even if the taskbar rules would skip them (ones flashing for attention).</param>
+        public static List<AppWindow> GetAppWindows(ICollection<IntPtr> include = null)
         {
             var list = new List<AppWindow>();
             Native.EnumWindows(delegate (IntPtr h, IntPtr l)
             {
-                var w = Inspect(h);
+                var w = Inspect(h, include != null && include.Contains(h));
                 if (w != null) list.Add(w);
                 return true;
             }, IntPtr.Zero);
@@ -46,6 +62,8 @@ namespace MacBar
         public static bool IsTaskbarWindow(IntPtr h)
         {
             if (!Native.IsWindowVisible(h)) return false;
+            // Always list a UAC prompt: with the Windows taskbar hidden, the dock is the only way to open it.
+            if (IsUacPrompt(h)) return true;
             long ex = Native.GetWindowLongPtr(h, Native.GWL_EXSTYLE).ToInt64();
             bool appWindow = (ex & Native.WS_EX_APPWINDOW) != 0;
             if (!appWindow)
@@ -62,13 +80,20 @@ namespace MacBar
             return true;
         }
 
-        static AppWindow Inspect(IntPtr h)
+        static AppWindow Inspect(IntPtr h, bool force)
         {
-            if (!IsTaskbarWindow(h)) return null;
+            if (force ? !Native.IsWindowVisible(h) : !IsTaskbarWindow(h)) return null;
             uint pid = Native.GetPid(h);
             if (pid == myPid) return null;
             var w = new AppWindow { Hwnd = h, Pid = pid, Title = Native.GetWindowTitle(h) };
             w.ExePath = ProcPath(pid);
+            if (IsUacPrompt(h))
+            {
+                w.IsUac = true;
+                // consent.exe runs as SYSTEM, so its path may be unreadable; it groups all prompts in one icon.
+                if (w.ExePath == null) w.ExePath = Path.Combine(Environment.SystemDirectory, "consent.exe");
+                return w;
+            }
             w.Aumid = Native.GetAumid(h);
             if (w.ExePath != null && w.ExePath.EndsWith("ApplicationFrameHost.exe", StringComparison.OrdinalIgnoreCase))
             {
@@ -84,17 +109,29 @@ namespace MacBar
             return w;
         }
 
-        public static void Activate(IntPtr h)
+        /// <summary>Brings a window forward the way the Windows taskbar does. Returns whether it got the foreground.</summary>
+        public static bool Activate(IntPtr h)
         {
             if (Native.IsIconic(h)) Native.ShowWindow(h, Native.SW_RESTORE);
-            Native.SetForegroundWindow(h);
-            if (Native.GetForegroundWindow() != h)
+            // Like the taskbar: if the window has an active popup (a dialog it owns), that's what gets focus.
+            IntPtr target = Native.GetLastActivePopup(h);
+            if (target == IntPtr.Zero || !Native.IsWindowVisible(target)) target = h;
+            Native.SetForegroundWindow(target);
+            if (!IsForeground(h, target))
             {
                 // Tapping Alt lets us take foreground when Windows' focus lock refuses.
                 Native.keybd_event(0x12, 0, 0, UIntPtr.Zero);
-                Native.SetForegroundWindow(h);
+                Native.SetForegroundWindow(target);
                 Native.keybd_event(0x12, 0, 2, UIntPtr.Zero);
             }
+            if (!IsForeground(h, target)) Native.SwitchToThisWindow(target, true);
+            return IsForeground(h, target);
+        }
+
+        static bool IsForeground(IntPtr h, IntPtr target)
+        {
+            IntPtr fg = Native.GetForegroundWindow();
+            return fg == h || fg == target;
         }
     }
 
@@ -519,6 +556,20 @@ namespace MacBar
             if (icon == IntPtr.Zero) icon = Native.GetClassLongPtr(h, -14);
             if (icon == IntPtr.Zero) icon = Native.GetClassLongPtr(h, -34);
             return FromHIcon(icon);
+        }
+
+        /// <summary>The Windows UAC shield (imageres.dll resource 78), for the dock's admin-prompt icon.</summary>
+        public static ImageSource UacShield(int px)
+        {
+            var icons = new IntPtr[1]; var ids = new uint[1];
+            string file = Path.Combine(Environment.SystemDirectory, "imageres.dll");
+            if (Native.PrivateExtractIcons(file, -78, px, px, icons, ids, 1, 0) == 1 && icons[0] != IntPtr.Zero)
+            {
+                var bs = FromHIcon(icons[0]);
+                Native.DestroyIcon(icons[0]);
+                if (bs != null) return bs;
+            }
+            return FromHIcon(System.Drawing.SystemIcons.Shield.Handle);
         }
 
         public static BitmapSource FromHIcon(IntPtr hicon)

@@ -18,11 +18,28 @@ import {timeout, removeSource} from './util.js';
 
 const GAP = 6; // space between the dock and the screen edge
 
+/** A window asking to be looked at, such as a password or admin-rights prompt that opened behind others. */
+function wantsAttention(w) {
+    return w.demands_attention || w.urgent;
+}
+
+/**
+ * The windows the dock lists for an app. Dialogs normally skip the taskbar, but an admin prompt is often
+ * such a dialog, and when GNOME opens it behind other windows the dock is the only way to reach it.
+ */
+function listed(w) {
+    return !w.skip_taskbar || wantsAttention(w);
+}
+
 function appWindows(app) {
-    // Windows on the current workspace first (MRU order from Shell), then the rest.
+    // Windows asking for attention first, then windows on the current workspace (MRU order from Shell),
+    // then the rest.
     const ws = global.workspace_manager.get_active_workspace();
-    const wins = app.get_windows().filter(w => !w.skip_taskbar);
-    return wins.filter(w => w.get_workspace() === ws).concat(wins.filter(w => w.get_workspace() !== ws));
+    const rank = w => (wantsAttention(w) ? 0 : 2) + (w.get_workspace() === ws ? 0 : 1);
+    return app.get_windows().filter(listed)
+        .map((w, i) => [w, i])
+        .sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1])
+        .map(([w]) => w);
 }
 
 const DockItem = GObject.registerClass(
@@ -109,6 +126,8 @@ class DockItem extends St.Button {
             else app.open_new_window(-1);
             return;
         }
+        // A prompt waiting for an answer comes first: it's what the click is most likely for.
+        if (wantsAttention(wins[0])) { Main.activateWindow(wins[0]); return; }
         const focus = global.display.focus_window;
         if (focus && wins.includes(focus)) {
             if (wins.length === 1) { focus.minimize(); return; }
@@ -208,6 +227,10 @@ export class Dock {
             [this._appSystem, this._appSystem.connect('app-state-changed', () => this._queueRebuild())],
             [this._appSystem, this._appSystem.connect('installed-changed', () => this._queueRebuild())],
             [global.display, global.display.connect('window-created', () => this._queueRebuild())],
+            [global.display, global.display.connect('window-demands-attention', (d, w) => this._onAttention(w))],
+            [global.display, global.display.connect('window-marked-urgent', (d, w) => this._onAttention(w))],
+            // Attention ends once the window is focused; a prompt listed only for that then drops out.
+            [global.display, global.display.connect('notify::focus-window', () => this._queueRebuild())],
             [global.workspace_manager, global.workspace_manager.connect('active-workspace-changed', () => this._syncDots())],
             [Main.layoutManager, Main.layoutManager.connect('monitors-changed', () => this._reposition())],
             [Main.overview, Main.overview.connect('showing', () => this._setShown(true, true))],
@@ -362,7 +385,7 @@ export class Dock {
         const favorites = AppFavorites.getAppFavorites().getFavorites();
         const favIds = new Set(favorites.map(a => a.get_id()));
         const running = Shell.AppSystem.get_default().get_running()
-            .filter(a => !favIds.has(a.get_id()) && a.get_windows().some(w => !w.skip_taskbar));
+            .filter(a => !favIds.has(a.get_id()) && a.get_windows().some(listed));
 
         const wanted = [['apps', null], ...favorites.map(a => ['pinned', a])];
         if (running.length) wanted.push(['sep', null]);
@@ -385,6 +408,18 @@ export class Dock {
             this.box.add_child(it);
         }
         this._reposition();
+    }
+
+    /** A window wants attention (e.g. an admin prompt opened behind others): show its app and bounce it. */
+    _onAttention(win) {
+        this._rebuild();
+        const app = Shell.WindowTracker.get_default().get_window_app(win);
+        const item = app && this._items.find(i => i.app === app);
+        if (!item) return;
+        // Keep an auto-hidden dock up for a couple of seconds so the bounce is seen.
+        this._lastWanted = Date.now() + 2000;
+        this._setShown(true);
+        item.bounce();
     }
 
     _syncDots() {

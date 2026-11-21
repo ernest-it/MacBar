@@ -135,6 +135,25 @@ export class SelfTest {
         this._warp(mon.width / 2, mon.height / 2);
         await sleep(600);
 
+        // A window asking for attention (an admin prompt that opened behind others) is reached from the dock.
+        const attnWin = this._windowsOf(calcId)[0], edWin0 = this._windowsOf(editorId)[0];
+        if (attnWin && edWin0) {
+            // Mutter ignores the request for a window that isn't covered, so put it behind the editor.
+            const er = edWin0.get_frame_rect();
+            attnWin.move_frame(true, er.x + 20, er.y + 20);
+            edWin0.move_resize_frame(true, er.x, er.y, Math.max(er.width, 700), Math.max(er.height, 700));
+            Main.activateWindow(edWin0);
+            await sleep(500);
+            attnWin.set_demands_attention();
+            await sleep(500);
+            const item = dock._items.find(i => i.app && i.app.get_id() === calcId);
+            this._check('attention app in dock', !!item && attnWin.demands_attention, `attn=${attnWin.demands_attention}`);
+            item?._onClick(1);
+            await sleep(500);
+            this._check('dock click focuses attention window', global.display.focus_window === attnWin,
+                `focus=${global.display.focus_window?.get_title()}`);
+        }
+
         // ----- Workspaces -----
         const ws = this._ext.workspaces;
         const calcWin = this._windowsOf(calcId)[0], edWin = this._windowsOf(editorId)[0];
@@ -201,16 +220,23 @@ export class SelfTest {
         edWin.make_fullscreen();
         await sleep(1500);
         const box = Main.layoutManager.panelBox;
+        const ui = box.get_parent();
+        const at = a => ui.get_children().indexOf(a);
+        const boxAt = at(box);
         this._check('fullscreen hides menu bar', !box.visible);
         this._check('fullscreen hides dock', !dock.container.visible);
         this._warp(mon.x + 600, mon.y);
         await sleep(800);
         this._check('top edge peeks menu bar', box.visible, `winFs=${edWin.is_fullscreen()} inFs=${mon.inFullscreen} focus=${global.display.focus_window?.get_title()}`);
+        // GNOME's dialogs (the admin password prompt) must stay clickable above the peeking bar.
+        const modalAt = at(Main.layoutManager.modalDialogGroup);
+        this._check('peek stays below dialogs', at(box) < modalAt, `box=${at(box)} modal=${modalAt}`);
         await this._shot('07-fullscreen-peek');
         this._warp(mon.x + 600, mon.y + 600);
         await sleep(1200);
         const tb = this._ext.topBar;
         this._check('menu bar hides after leaving', !box.visible, `inFs=${mon.inFullscreen} peeking=${tb._peeking} timer=${tb._peekTimer} ptr=${global.get_pointer().slice(0,2)} activeMenu=${!!Main.panel.menuManager.activeMenu} winFs=${edWin.is_fullscreen()}`);
+        this._check('peek restores stacking', at(box) === boxAt, `before=${boxAt} after=${at(box)}`);
         // Super key / app grid over a full-screen app brings the dock and bar back.
         Main.overview.showApps();
         await sleep(1800);

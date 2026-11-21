@@ -240,15 +240,59 @@ namespace MacBar
                 s.TaskbarHidden = true;
                 s.Save();
             }
+            EndReveal();
             // Auto-hide frees the screen space the taskbar reserves; hiding the window removes it visually.
             SetState(s.SavedTaskbarState | ABS_AUTOHIDE);
             HideWindows();
             if (timer == null)
             {
                 timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
-                timer.Tick += delegate { HideWindows(); };
+                timer.Tick += delegate { Tick(); };
                 timer.Start();
             }
+        }
+
+        // ----- showing the real taskbar for a moment (a held-back UAC prompt only opens from its button) -----
+
+        static Func<bool> revealDone;
+        static DateTime revealUntil;
+
+        /// <summary>True while the real taskbar is shown on purpose. Raised with true/false as that starts/ends.</summary>
+        public static bool Revealing { get { return revealDone != null; } }
+        public static event Action<bool> RevealChanged;
+
+        /// <summary>Shows Explorer's taskbar (not auto-hidden) until <paramref name="done"/> returns true, at most 2 minutes.</summary>
+        public static void Reveal(Func<bool> done)
+        {
+            if (timer == null || settings == null) return; // the taskbar isn't hidden
+            bool already = Revealing;
+            revealDone = done;
+            revealUntil = DateTime.Now.AddMinutes(2);
+            if (already) return;
+            App.Trace("taskbar revealed for a UAC prompt");
+            SetState(settings.SavedTaskbarState & ~ABS_AUTOHIDE);
+            foreach (var h in TaskbarWindows()) Native.ShowWindowAsync(h, Native.SW_SHOWNA);
+            if (RevealChanged != null) RevealChanged(true);
+        }
+
+        static void Tick()
+        {
+            if (Revealing)
+            {
+                bool over;
+                try { over = revealDone(); } catch { over = true; }
+                if (!over && DateTime.Now < revealUntil) return;
+                EndReveal();
+                SetState(settings.SavedTaskbarState | ABS_AUTOHIDE);
+            }
+            HideWindows();
+        }
+
+        static void EndReveal()
+        {
+            if (!Revealing) return;
+            revealDone = null;
+            if (RevealChanged != null) RevealChanged(false);
         }
 
         /// <summary>
@@ -275,6 +319,7 @@ namespace MacBar
 
         public static void Restore(Settings s)
         {
+            EndReveal();
             if (timer != null) { timer.Stop(); timer = null; }
             foreach (var h in TaskbarWindows()) Native.ShowWindowAsync(h, Native.SW_SHOWNA);
             if (s.TaskbarHidden)

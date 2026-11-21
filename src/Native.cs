@@ -130,6 +130,12 @@ namespace MacBar
         [DllImport("user32.dll")] public static extern bool UnhookWinEvent(IntPtr h);
         [DllImport("user32.dll")] public static extern IntPtr CopyIcon(IntPtr h);
         [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr h);
+        [DllImport("user32.dll")] public static extern bool RegisterShellHookWindow(IntPtr h);
+        [DllImport("user32.dll")] public static extern bool DeregisterShellHookWindow(IntPtr h);
+        [DllImport("user32.dll")] public static extern void SwitchToThisWindow(IntPtr h, bool altTab);
+        [DllImport("user32.dll")] public static extern IntPtr GetLastActivePopup(IntPtr h);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern uint PrivateExtractIcons(string file, int index, int cx, int cy, IntPtr[] icons, uint[] ids, uint n, uint flags);
+        public const int HSHELL_WINDOWCREATED = 1, HSHELL_WINDOWDESTROYED = 2, HSHELL_WINDOWACTIVATED = 4, HSHELL_REDRAW = 6, HSHELL_HIGHBIT = 0x8000;
         [DllImport("user32.dll")] public static extern IntPtr GetDC(IntPtr h);
         [DllImport("user32.dll")] public static extern int ReleaseDC(IntPtr h, IntPtr dc);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern ushort RegisterClassEx(ref WNDCLASSEX wc);

@@ -34,6 +34,9 @@ On Ubuntu? See [MacBar for Ubuntu](ubuntu/) (a GNOME Shell extension). Download 
 - Stays on screen by default. Optional auto-hide (Settings → Dock → Hide the dock automatically): macOS-style (slides back up when the cursor hits the bottom edge) or only when a window overlaps it
 - Click: launch / focus / minimize / cycle windows. Right-click: window list, Keep in Dock,
   Remove from Dock, New Window, Show in File Explorer, Quit
+- Apps that need you (a window flashing for attention) bounce until you look. **Admin prompts**: when
+  Windows holds a UAC prompt back as a taskbar button, it shows in the dock as a bouncing shield; click it
+  to open the prompt (if Windows won't open it from there, the Windows taskbar comes back until it's answered)
 
 **Workspaces** (system menu → Workspaces)
 - Save where every window goes across your monitors, then put it all back in one click

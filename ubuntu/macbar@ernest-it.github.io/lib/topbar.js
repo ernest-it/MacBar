@@ -280,12 +280,22 @@ export class TopBar {
         if (this._peeking === on) return;
         this._peeking = on;
         const box = Main.layoutManager.panelBox;
+        const parent = box.get_parent();
         if (on) {
             box.show();
-            // Above the full-screen window.
-            const parent = box.get_parent();
-            if (parent) parent.set_child_above_sibling(box, null);
+            // Above the full-screen window, but below GNOME's own dialogs (the admin password prompt)
+            // and the lock screen, which sit in modalDialogGroup and above it.
+            if (parent) {
+                this._peekNext = box.get_next_sibling();
+                const modal = Main.layoutManager.modalDialogGroup;
+                if (modal && modal.get_parent() === parent) parent.set_child_below_sibling(box, modal);
+                else parent.set_child_above_sibling(box, null);
+            }
         } else {
+            // Put the bar back where it was in the stacking order.
+            const next = this._peekNext;
+            this._peekNext = null;
+            if (parent && next && next !== box && next.get_parent() === parent) parent.set_child_below_sibling(box, next);
             Main.layoutManager._updateVisibility?.();
         }
         Main.layoutManager._queueUpdateRegions?.();

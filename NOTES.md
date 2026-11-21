@@ -499,3 +499,37 @@ caption, so they don't trigger it.
 - Test: `test/fake-player.js` is a gjs MPRIS player run by run.sh; the self-test checks the island shows
   the track, hides controls until hover, shows them with the setting, that clicking skip in the bar
   changes the track without opening the player, and that they hide again. 35/35 on 24.04 and 25.10.
+
+## Round 18: admin (UAC) prompts reachable from the dock (Windows + Ubuntu)
+
+- Report: an admin prompt that stayed in the taskbar couldn't be opened from MacBar; the only way was to
+  quit MacBar and click it on the Windows taskbar.
+- Cause (Windows): when the app asking for admin rights isn't in the foreground, Windows holds the prompt
+  back and shows a flashing taskbar button instead. It's a window from `consent.exe` (SYSTEM) with class
+  `$$$Secure UAP Dummy Window Class For Interim Dialog`, and clicking the button is what opens the prompt.
+  MacBar hides the taskbar and didn't listen for flashes, so nothing pointed at it.
+- Fix (Windows):
+  - The dock registers as a shell hook window (`RegisterShellHookWindow`, the "SHELLHOOK" message Explorer's
+    taskbar gets). `HSHELL_FLASH` marks a window as wanting attention until `HSHELL_WINDOWACTIVATED`; its
+    icon bounces (again every 3 s while it waits) and an auto-hidden dock comes up for 3 s. Flashing windows
+    are listed even if the taskbar rules would skip them, and a click goes to them first.
+  - consent.exe windows are always listed, as "User Account Control" with the imageres.dll shield (-78).
+  - `WindowTracker.Activate` now works like the taskbar: it focuses `GetLastActivePopup()`, falls back to
+    `SwitchToThisWindow`, and returns whether the window got the foreground.
+  - Activating the button window may not open the prompt (unverified against a real held-back prompt:
+    Windows wouldn't produce one on demand). So 1.2 s after the click, if the button is still there, no secure desktop took
+    over (the foreground window would be NULL) and no prompt dialog is in front, `TaskbarHider.Reveal()`
+    brings the real taskbar back (auto-hide off) and hides the dock until the button goes away (2 min at
+    most). `EnsureWorkArea` leaves the work area alone meanwhile. Right-click → Show Windows Taskbar does
+    the same by hand.
+- Test: a stand-in window with the same class name, shown minimized without focus and flashing. The dock
+  listed and bounced it at once; the click activated it; the taskbar came back, its button opened the
+  window, and the taskbar hid again when the window closed. A real held-back prompt couldn't be produced
+  on demand (Windows showed the full prompt each time).
+- Ubuntu: the dock left out every `skip_taskbar` window, which includes an app's own dialogs (password
+  prompts among them). Windows that demand attention or are urgent are now listed, sorted first, opened
+  by a click, and make the dock bounce the app (`window-demands-attention`, `window-marked-urgent`).
+- Ubuntu: the full-screen peek raised `panelBox` to the top of `uiGroup` and never put it back, so after
+  one peek the menu bar sat above GNOME's dialogs (the polkit password prompt) and the lock screen. It now
+  goes just below `modalDialogGroup` during the peek and back to its old place after. New checks for both:
+  39/39 on 24.04, 25.04 and 25.10.
