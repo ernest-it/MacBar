@@ -323,11 +323,12 @@ export class TopBar {
         if (now - this._awaySince >= 500) this._setPeek(false);
     }
 
-    // ----- Super key opens the app grid -----
+    // ----- Super key: optionally straight to the app grid -----
 
     _setupSuperKey() {
-        // Main's handler toggles the overview first; ours runs after it. If that just opened the
-        // overview, switch it to the app grid (if it just closed it, leave it closed).
+        // By default GNOME's own behavior stays: one press shows the windows, a quick second press the
+        // app grid. With the setting on: Main's handler toggles the overview first and ours runs after
+        // it. If that just opened the overview, switch it to the app grid (if it just closed it, leave it closed).
         this._showingAt = 0;
         this._showingId = Main.overview.connect('showing', () => { this._showingAt = Date.now(); });
         this._overlayId = global.display.connect('overlay-key', () => {

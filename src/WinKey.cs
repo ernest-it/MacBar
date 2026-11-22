@@ -7,7 +7,7 @@ namespace MacBar
 {
     /// <summary>
     /// Takes over a lone press of the Windows key (press and release with nothing else in between) so it
-    /// opens MacBar's app page instead of the Windows Start menu. Win+E, Win+D, Win+Shift+S and other
+    /// opens MacBar's window overview (or, tapped twice, the app page) instead of the Windows Start menu. Win+E, Win+D, Win+Shift+S and other
     /// shortcuts keep working because only the release is touched, and only when no other key was pressed.
     /// The hook runs on its own thread so a busy UI thread can never make Windows skip it.
     /// </summary>

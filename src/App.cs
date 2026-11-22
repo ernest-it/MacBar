@@ -9,8 +9,8 @@ using Microsoft.Win32;
 [assembly: System.Reflection.AssemblyTitle("MacBar")]
 [assembly: System.Reflection.AssemblyProduct("MacBar")]
 [assembly: System.Reflection.AssemblyDescription("macOS-style menu bar and dock for Windows")]
-[assembly: System.Reflection.AssemblyVersion("1.4.4.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.4.4.0")]
+[assembly: System.Reflection.AssemblyVersion("1.4.5.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.4.5.0")]
 
 namespace MacBar
 {
@@ -82,8 +82,8 @@ namespace MacBar
             Weather.Refresh();
             Workspaces.Load();
             Workspaces.RunAtSignIn(Dispatcher);
-            // A lone Windows key press opens the app page instead of the Windows Start menu.
-            WinKey.Start(Dispatcher, delegate { if (!cleanedUp) ToggleAppsPage(); });
+            // A lone Windows key press opens the window overview instead of the Windows Start menu; a double tap, the app page.
+            WinKey.Start(Dispatcher, delegate { if (!cleanedUp) OnWinKey(); });
 
             // Warm up the app page's list and icons in the background so it opens instantly.
             var warm = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
@@ -247,7 +247,7 @@ namespace MacBar
 
         void UpdateBarVisibility()
         {
-            bool appsOpen = launchpad != null && launchpad.IsVisible;
+            bool appsOpen = (launchpad != null && launchpad.IsVisible) || (overview != null && overview.IsVisible);
             bool showTop = !fullscreenNow || appsOpen || peekTop;
             bool showDock = !fullscreenNow || appsOpen;
             if (top != null)
@@ -300,22 +300,60 @@ namespace MacBar
         public TrayHost Tray { get { return tray; } }
 
         LaunchpadWindow launchpad;
+        OverviewWindow overview;
+        DateTime lastWinTap = DateTime.MinValue;
+
         public void ToggleAppsPage()
         {
-            if (launchpad == null)
-            {
-                launchpad = new LaunchpadWindow();
-                // The dock comes up with the app page and stays above it, like the Windows key bringing up the taskbar.
-                launchpad.IsVisibleChanged += delegate
-                {
-                    dock.HoldShown = launchpad.IsVisible;
-                    // Over a full-screen game the bars are hidden; bring them back with the app page.
-                    UpdateBarVisibility();
-                    if (launchpad.IsVisible) { top.BringToFront(); dock.BringToFront(); }
-                };
-                launchpad.Activated += delegate { dock.BringToFront(); };
-            }
+            EnsurePages();
             launchpad.Toggle();
+        }
+
+        /// <summary>
+        /// Windows key, like GNOME's Super key: one tap shows every open window (with the dock), a quick
+        /// second tap switches to the app page, and a tap while either is open closes it.
+        /// </summary>
+        void OnWinKey()
+        {
+            EnsurePages();
+            DateTime now = DateTime.Now;
+            bool second = (now - lastWinTap).TotalMilliseconds < Math.Max(350, Native.GetDoubleClickTime() + 50);
+            lastWinTap = now;
+            if (second && overview.IsVisible && !overview.IsClosing)
+            {
+                lastWinTap = DateTime.MinValue; // a third tap counts as a new first tap
+                // App page first, then drop the overview: hiding it first would hand focus to some other
+                // window, which closes the app page again.
+                launchpad.Open();
+                overview.DismissNow();
+                return;
+            }
+            if (launchpad.IsVisible) { launchpad.Dismiss(); return; }
+            if (overview.IsVisible && !overview.IsClosing) { overview.Dismiss(IntPtr.Zero); return; }
+            overview.Open();
+        }
+
+        public void ShowOverview() { EnsurePages(); if (!overview.IsVisible || overview.IsClosing) overview.Open(); }
+
+        void EnsurePages()
+        {
+            if (launchpad != null) return;
+            launchpad = new LaunchpadWindow();
+            overview = new OverviewWindow();
+            overview.TypeToSearch = delegate (string text) { launchpad.Open(text); overview.DismissNow(); };
+            foreach (Window w in new Window[] { launchpad, overview })
+            {
+                var page = w;
+                // The dock comes up with the page and stays above it, like the Windows key bringing up the taskbar.
+                page.IsVisibleChanged += delegate
+                {
+                    dock.HoldShown = launchpad.IsVisible || overview.IsVisible;
+                    // Over a full-screen game the bars are hidden; bring them back with the page.
+                    UpdateBarVisibility();
+                    if (page.IsVisible) { top.BringToFront(); dock.BringToFront(); }
+                };
+                page.Activated += delegate { dock.BringToFront(); };
+            }
         }
 
         public void PinApp(PinnedApp pin)

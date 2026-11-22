@@ -248,6 +248,24 @@ export class SelfTest {
         edWin.unmake_fullscreen();
         await sleep(800);
 
+        // Super key, as in Ubuntu: one press shows the windows, a quick second press the app grid.
+        const ctl = Main.overview._overview.controls;
+        const ovState = () => ctl._stateAdjustment.value;
+        global.display.emit('overlay-key');
+        await sleep(1200);
+        this._check('super shows window overview', Main.overview.visible && Math.abs(ovState() - 1) < 0.01, `visible=${Main.overview.visible} state=${ovState()}`);
+        this._check('window overview shows dock', dock.container.visible);
+        await this._shot('08b-window-overview');
+        Main.overview.hide();
+        await sleep(1200);
+        global.display.emit('overlay-key');
+        await sleep(80);
+        global.display.emit('overlay-key');
+        await sleep(1500);
+        this._check('double super opens app grid', Main.overview.visible && Math.abs(ovState() - 2) < 0.01, `visible=${Main.overview.visible} state=${ovState()}`);
+        Main.overview.hide();
+        await sleep(1200);
+
         // Now Playing island, fed by test/fake-player.js.
         const np = Main.panel.statusArea['macbar-nowplaying'];
         const npSt = this._ext.getSettings();

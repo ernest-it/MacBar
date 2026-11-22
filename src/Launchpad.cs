@@ -295,7 +295,10 @@ namespace MacBar
 
         public void Toggle() { if (IsVisible && !closing) Dismiss(); else Open(); }
 
-        public void Open()
+        public void Open() { Open(null); }
+
+        /// <param name="query">Search text to start with (typing in the window overview lands here).</param>
+        public void Open(string query)
         {
             closing = false;
             var src = PresentationSource.FromVisual(App.Instance.MainBar);
@@ -309,7 +312,8 @@ namespace MacBar
             cellW = Math.Max(CellW, Math.Min(220, (Width - 240) / cols));
             cellH = Math.Max(CellH, Math.Min(190, (Height - 300) / rows));
             if (AppCatalog.Apps.Count == 0 || AppCatalog.Stale) AppCatalog.Refresh(Dispatcher, (int)Math.Round(IconDip * scale));
-            search.Text = "";
+            search.Text = query ?? "";
+            search.CaretIndex = search.Text.Length;
             Filter();
             SetAlpha(0);
             Show();

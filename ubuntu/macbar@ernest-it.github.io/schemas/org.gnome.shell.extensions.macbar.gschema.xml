@@ -12,7 +12,7 @@
     <key name="show-lighting" type="b"><default>true</default><summary>Show OpenRGB lighting profiles</summary></key>
     <key name="clock-on-right" type="b"><default>true</default><summary>Move the clock to the right end like macOS</summary></key>
     <key name="peek-fullscreen" type="b"><default>true</default><summary>Bring the menu bar down over full-screen apps when the mouse is at the top edge</summary></key>
-    <key name="super-opens-apps" type="b"><default>true</default><summary>The Super key opens the app grid</summary></key>
+    <key name="super-opens-apps" type="b"><default>false</default><summary>One press of the Super key opens the app grid (skipping the window overview)</summary></key>
     <!-- Dock -->
     <key name="show-dock" type="b"><default>true</default><summary>Show the dock</summary></key>
     <key name="dock-autohide" type="s"><default>'never'</default><summary>never, always, intellihide</summary></key>

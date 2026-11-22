@@ -16,7 +16,7 @@ On Ubuntu? See [MacBar for Ubuntu](ubuntu/) (a GNOME Shell extension). Download 
 
 ![Dock](docs/screenshots/dock.png)
 
-**App page** (Windows key or the Apps button), with local search across apps and Settings
+**App page** (double-tap the Windows key, or the Apps button), with local search across apps and Settings
 
 ![App page](docs/screenshots/app-page.png)
 ![Search](docs/screenshots/search.png)
@@ -28,7 +28,10 @@ On Ubuntu? See [MacBar for Ubuntu](ubuntu/) (a GNOME Shell extension). Download 
 - App icons only, centered; the dock grows and shrinks with the number of apps
 - Pinned apps (imported from your Windows taskbar pins on first run), running apps after a divider
 - Running-app dots, hover zoom, launch bounce, drag to reorder pinned apps
-- **Apps** button (first in the dock) or the **Windows key** opens a Launchpad-style app page (the dock comes up with it): every installed app in a
+- **Windows key**, like the Super key in Ubuntu: one tap shows every open window as a live thumbnail, laid out
+  between the menu bar and the dock (click one to switch to it, middle-click to close it, arrow keys + Enter,
+  Esc or another tap to close; typing searches the app page). A quick double tap opens the app page.
+- **Apps** button (first in the dock) or a double tap of the Windows key opens a Launchpad-style app page (the dock comes up with it): every installed app in a
   paged grid over a blurred backdrop, with instant search across apps, Settings pages and your files (local only: no Bing, no web results; Enter opens the top result), mouse-wheel /
   arrow-key paging, and right-click → Keep in Dock
 - Stays on screen by default. Optional auto-hide (Settings → Dock → Hide the dock automatically): macOS-style (slides back up when the cursor hits the bottom edge) or only when a window overlaps it
@@ -78,7 +81,7 @@ On Ubuntu? See [MacBar for Ubuntu](ubuntu/) (a GNOME Shell extension). Download 
 - Automatic light/dark theme (or force one)
 - Hide automatically when an app goes full screen (videos, games, F11). While hidden, hold the mouse at the
   top edge to bring the menu bar down (it hides again when you leave it), and the Windows key brings up the
-  dock with the app page
+  dock with the window overview or the app page
 - Windows use the full screen height; the menu bar reserves its strip by default so desktop icons and
   title bars aren't covered (both are configurable)
 

@@ -533,3 +533,46 @@ caption, so they don't trigger it.
   one peek the menu bar sat above GNOME's dialogs (the polkit password prompt) and the lock screen. It now
   goes just below `modalDialogGroup` during the peek and back to its old place after. New checks for both:
   39/39 on 24.04, 25.04 and 25.10.
+
+## Round 19: Windows key shows open windows, double tap opens the app page (Windows + Ubuntu)
+
+- Request: like Ubuntu, one press of the Windows key should show all open windows with the apps (dock) at
+  the bottom; a double press should open the app page as before.
+- Windows: new `OverviewWindow` (src/Overview.cs).
+  - Same window setup as the app page: full screen on the primary monitor, not layered, DWM frame extended,
+    acrylic accent. It has to be non-layered: DWM thumbnails don't draw on layered windows.
+  - Every window `WindowTracker.GetAppWindows()` lists (minus UAC entries) gets a DWM thumbnail
+    (`DwmRegisterThumbnail`), so they stay live. Window rects are read with the thread switched to
+    per-monitor-v2 so they're physical pixels, and `rcSource` is the extended frame bounds so the invisible
+    resize borders aren't drawn.
+  - Layout: the row count that gives the largest total thumbnail area (scale capped at 0.6, 0.7 for a single
+    window), rows centered, title and app icon under each thumbnail. The area runs from below the menu bar
+    to above the dock.
+  - Opening animates each thumbnail from its window's real position to its grid spot (ease-out, 230 ms,
+    stepped per rendered frame with `DwmUpdateThumbnailProperties`); closing reverses it. Minimized
+    windows have no usable thumbnail, so they get a card with the app icon (dock-style icon lookup,
+    so Store apps like Settings have theirs).
+  - Click switches to the window (activated while the overview still covers the screen, then hidden),
+    middle-click sends WM_CLOSE and re-lays out once it's gone, arrows/Tab + Enter, Esc. Typing hands the
+    text to the app page's search (`LaunchpadWindow.Open(query)`). Losing focus closes it.
+  - `App.OnWinKey`: tap = overview; a second tap within the double-click time (+50 ms, at least 350 ms)
+    while the overview is open = app page; a tap while either is open closes it. The app page is opened
+    *before* the overview is hidden: hiding first let Windows give focus to another window, whose
+    activation then closed the app page right away.
+  - If `Activate()` doesn't get the foreground, the overview taps Alt and retries (same trick as
+    `WindowTracker.Activate`).
+  - The dock is held up and the bars come back over full-screen apps for the overview too.
+- Test (on the real desktop, 3440x1440, 18 windows): one tap showed the overview with the dock and had focus;
+  Esc and a second tap closed it; a double tap opened the app page and it stayed open; a click on a
+  thumbnail switched to that window.
+- Ubuntu: GNOME already does this (overviewControls.js: a second overlay-key press while the overview is
+  still opening shifts to the app grid). MacBar's Super→app grid override is now off by default
+  (`super-opens-apps` false, still in Settings as "Super key goes straight to the app grid"). New checks:
+  one press = window picker with the dock, two quick presses = app grid. 42/42 (MacBar/ubuntu) and 33/33
+  (MacBar-Ubuntu) on 24.04, 25.04 and 25.10; one 25.10 run had the second press land after the opening
+  animation (which closes the overview, by GNOME's design) and passed on two reruns.
+- Workspaces editor (Windows): the name looked like a heading, so renaming was hard to find. It's now a
+  bordered text field under a "Name" label with a **Rename** button (focuses it with the name selected);
+  double-clicking a workspace in the list does the same, Esc puts the old name back. The name used to be
+  saved only on LostFocus, which doesn't fire when the window closes; it's now also saved on close and
+  when switching to another workspace (deferred, since saving refreshes the list).

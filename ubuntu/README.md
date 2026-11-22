@@ -77,7 +77,7 @@ Settings: click the logo at the top left, then **MacBar Settings…**.
 - Both bars hide while an app is full screen.
 - Hold the mouse at the top edge for a moment and the menu bar slides down. It hides again when you
   move away. It doesn't trigger while a game has the mouse locked.
-- The Super key brings up the app grid with the dock and menu bar over the game.
+- The Super key brings up the window overview (or the app grid) with the dock and menu bar over the game.
 
 **Workspaces** (system menu → Workspaces)
 - Save where every window goes across your monitors, then put it all back in one click.
@@ -94,7 +94,8 @@ Settings: click the logo at the top left, then **MacBar Settings…**.
   Rename workspaces, pick Chrome profiles and set the sign-in option in MacBar Settings → Workspaces.
 
 **Behavior**
-- The Super key opens the app grid, like Launchpad (can be turned off).
+- The Super key works as in Ubuntu: one press shows all open windows with the dock below, a double
+  press opens the app grid. MacBar Settings can make one press go straight to the app grid.
 - Login starts on the desktop instead of the overview.
 
 ## Known limitations

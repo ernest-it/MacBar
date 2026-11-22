@@ -87,7 +87,8 @@ export default class MacBarPrefs extends ExtensionPreferences {
         items.add(switchRow(s, 'clock-on-right', 'Clock on the right'));
         general.add(items);
         const behave = new Adw.PreferencesGroup({title: 'Behavior'});
-        behave.add(switchRow(s, 'super-opens-apps', 'Super key opens the app grid'));
+        behave.add(switchRow(s, 'super-opens-apps', 'Super key goes straight to the app grid',
+            'Off: one press shows your open windows, a double press the app grid'));
         behave.add(switchRow(s, 'peek-fullscreen', 'Show the menu bar over full-screen apps',
             'Hold the mouse at the top edge in a full-screen game or video'));
         general.add(behave);

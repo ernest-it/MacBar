@@ -45,6 +45,8 @@ namespace MacBar
             side.Children.Add(head);
             list.Margin = new Thickness(6, 0, 6, 0);
             list.SelectionChanged += delegate { Show(list.SelectedItem as Workspace); };
+            // Double-click a workspace in the list to rename it.
+            list.MouseDoubleClick += delegate { if (list.SelectedItem != null) BeginRename(); };
             list.DisplayMemberPath = "Name";
             side.Children.Add(list);
             grid.Children.Add(side);
@@ -56,6 +58,8 @@ namespace MacBar
 
             Workspaces.Changed += RefreshList;
             Closed += delegate { Workspaces.Changed -= RefreshList; };
+            // A name being typed when the window closes wouldn't otherwise be saved (no LostFocus on close).
+            Closing += delegate { if (commitName != null) commitName(); };
             RefreshList();
             if (Workspaces.All.Count > 0) list.SelectedIndex = 0; else Show(null);
         }
@@ -113,8 +117,26 @@ namespace MacBar
 
         // ------------------------------------------------------------ detail
 
+        Action commitName;
+        TextBox nameBox;
+
+        /// <summary>Puts the cursor in the name field with the whole name selected, ready to type over.</summary>
+        void BeginRename()
+        {
+            if (nameBox == null) return;
+            nameBox.Focus();
+            Keyboard.Focus(nameBox);
+            nameBox.SelectAll();
+        }
+
         void Show(Workspace ws)
         {
+            // Save a name still being typed for the workspace we're leaving, after this switch (saving
+            // refreshes the list, which would otherwise select the old workspace again).
+            var pending = commitName;
+            commitName = null;
+            nameBox = null;
+            if (pending != null) Dispatcher.BeginInvoke(pending);
             current = ws;
             detail.Children.Clear();
             previewRects.Clear();
@@ -130,10 +152,34 @@ namespace MacBar
                 return;
             }
 
-            var name = new TextBox { Text = ws.Name, FontSize = 18, FontWeight = FontWeights.SemiBold, BorderThickness = new Thickness(0, 0, 0, 1), Padding = new Thickness(0, 2, 0, 2) };
-            name.LostFocus += delegate { if (name.Text.Trim().Length > 0 && name.Text != ws.Name) { ws.Name = name.Text.Trim(); Workspaces.Save(); } };
-            name.KeyDown += delegate (object s, KeyEventArgs e) { if (e.Key == Key.Enter) Keyboard.ClearFocus(); };
-            detail.Children.Add(name);
+            // The name is an obvious text field with a Rename button next to it (it used to look like a heading).
+            detail.Children.Add(new TextBlock { Text = "Name", Foreground = Brushes.DimGray, FontSize = 11.5, Margin = new Thickness(0, 0, 0, 3) });
+            var name = new TextBox
+            {
+                Text = ws.Name, FontSize = 17, FontWeight = FontWeights.SemiBold, Padding = new Thickness(6, 3, 6, 3), VerticalContentAlignment = VerticalAlignment.Center,
+                Background = new SolidColorBrush(Color.FromRgb(0xF7, 0xF7, 0xF8)), BorderBrush = new SolidColorBrush(Color.FromRgb(0xC8, 0xC8, 0xCC)), BorderThickness = new Thickness(1),
+                ToolTip = "Type a new name, then press Enter"
+            };
+            var renameBtn = new Button { Content = "Rename", Padding = new Thickness(14, 4, 14, 4), Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Stretch };
+            renameBtn.Click += delegate { BeginRename(); };
+            var nameRow = new DockPanel();
+            DockPanel.SetDock(renameBtn, Dock.Right);
+            nameRow.Children.Add(renameBtn);
+            nameRow.Children.Add(name);
+            nameBox = name;
+            Action commit = delegate
+            {
+                string v = name.Text.Trim();
+                if (v.Length > 0 && v != ws.Name) { ws.Name = v; Workspaces.Save(); }
+            };
+            commitName = commit;
+            name.LostFocus += delegate { commit(); };
+            name.KeyDown += delegate (object s, KeyEventArgs e)
+            {
+                if (e.Key == Key.Enter) Keyboard.ClearFocus();
+                else if (e.Key == Key.Escape) { name.Text = ws.Name; Keyboard.ClearFocus(); e.Handled = true; }
+            };
+            detail.Children.Add(nameRow);
 
             // Run buttons up top.
             var run = new WrapPanel { Margin = new Thickness(0, 12, 0, 0) };
